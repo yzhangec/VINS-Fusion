@@ -33,7 +33,7 @@ size_t pub_counter = 0;
 
 void registerPub(ros::NodeHandle &n) {
   pub_latest_odometry = n.advertise<nav_msgs::Odometry>("imu_propagate", 1000);
-  pub_latest_camera_pose = n.advertise<geometry_msgs::PoseStamped>("camera_pose_latest", 1000);
+  pub_latest_camera_pose = n.advertise<geometry_msgs::PoseStamped>("imu_propagate_camera_pose", 1000);
   pub_path = n.advertise<nav_msgs::Path>("path", 1000);
   pub_odometry = n.advertise<nav_msgs::Odometry>("odometry", 1000);
   pub_point_cloud = n.advertise<sensor_msgs::PointCloud>("point_cloud", 1000);
@@ -343,7 +343,7 @@ void pubKeyframe(const Estimator &estimator) {
     Quaterniond R = Quaterniond(estimator.Rs[i]);
 
     nav_msgs::Odometry odometry;
-    odometry.header.stamp = ros::Time(estimator.Headers[WINDOW_SIZE - 2]);
+    odometry.header.stamp = ros::Time(estimator.Headers[i]);
     odometry.header.frame_id = "world";
     odometry.pose.pose.position.x = P.x();
     odometry.pose.pose.position.y = P.y();
