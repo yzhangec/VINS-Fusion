@@ -20,6 +20,7 @@
 #include "estimator/estimator.h"
 #include "estimator/parameters.h"
 #include "utility/visualization.h"
+#include "diagnostic_msgs/DiagnosticArray.h"
 
 Estimator estimator;
 
@@ -32,6 +33,7 @@ std::mutex m_buf;
 
 void img0_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
+
     m_buf.lock();
     img0_buf.push(img_msg);
     m_buf.unlock();
@@ -39,6 +41,7 @@ void img0_callback(const sensor_msgs::ImageConstPtr &img_msg)
 
 void img1_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
+
     m_buf.lock();
     img1_buf.push(img_msg);
     m_buf.unlock();
@@ -77,6 +80,7 @@ void sync_process()
             cv::Mat image0, image1;
             std_msgs::Header header;
             double time = 0;
+            ros::Time time_stamp;
             m_buf.lock();
             if (!img0_buf.empty() && !img1_buf.empty())
             {
@@ -94,7 +98,8 @@ void sync_process()
                 }
                 else
                 {
-                    time = img0_buf.front()->header.stamp.toSec();
+                    //time = img0_buf.front()->header.stamp.toSec();
+                    time_stamp = img0_buf.front()->header.stamp;
                     header = img0_buf.front()->header;
                     image0 = getImageFromMsg(img0_buf.front());
                     img0_buf.pop();
@@ -105,24 +110,26 @@ void sync_process()
             }
             m_buf.unlock();
             if(!image0.empty())
-                estimator.inputImage(time, image0, image1);
+                estimator.inputImage(time_stamp, image0, image1);
         }
         else
         {
             cv::Mat image;
             std_msgs::Header header;
             double time = 0;
+            ros::Time time_stamp;
             m_buf.lock();
             if(!img0_buf.empty())
             {
-                time = img0_buf.front()->header.stamp.toSec();
+                //time = img0_buf.front()->header.stamp.toSec();
+                time_stamp = img0_buf.front()->header.stamp;
                 header = img0_buf.front()->header;
                 image = getImageFromMsg(img0_buf.front());
                 img0_buf.pop();
             }
             m_buf.unlock();
             if(!image.empty())
-                estimator.inputImage(time, image);
+                estimator.inputImage(time_stamp, image);
         }
 
         std::chrono::milliseconds dura(2);
@@ -174,8 +181,9 @@ void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
         xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
         featureFrame[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
     }
-    double t = feature_msg->header.stamp.toSec();
-    estimator.inputFeature(t, featureFrame);
+    //double t = feature_msg->header.stamp.toSec();
+    ros::Time time_stamp = feature_msg->header.stamp;
+    estimator.inputFeature(time_stamp, featureFrame);
     return;
 }
 
@@ -226,8 +234,8 @@ int main(int argc, char **argv)
 
     ros::Subscriber sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
     ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
-    ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 100, img0_callback);
-    ros::Subscriber sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback);
+    ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 100, img0_callback, ros::TransportHints().tcpNoDelay());
+    ros::Subscriber sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback, ros::TransportHints().tcpNoDelay());
 
     std::thread sync_thread{sync_process};
     ros::spin();

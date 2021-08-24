@@ -17,6 +17,9 @@ double GYR_N, GYR_W;
 std::vector<Eigen::Matrix3d> RIC;
 std::vector<Eigen::Vector3d> TIC;
 
+Eigen::Matrix3d center_R_imu;
+Eigen::Vector3d center_T_imu;
+
 Eigen::Vector3d G{0.0, 0.0, 9.8};
 
 double BIAS_ACC_THRESHOLD;
@@ -173,6 +176,13 @@ void readParameters(std::string config_file)
         RIC.push_back(T.block<3, 3>(0, 0));
         TIC.push_back(T.block<3, 1>(0, 3));
     }
+
+    cv::Mat cv_center_T_imu;
+    fsSettings["center_T_imu"] >> cv_center_T_imu;
+    Eigen::Matrix4d T_temp;
+    cv::cv2eigen(cv_center_T_imu, T_temp);
+    center_R_imu = T_temp.block<3, 3>(0, 0);
+    center_T_imu = T_temp.block<3, 1>(0, 3);
 
     INIT_DEPTH = 5.0;
     BIAS_ACC_THRESHOLD = 0.1;

@@ -34,6 +34,8 @@ extern double GYR_N, GYR_W;
 
 extern std::vector<Eigen::Matrix3d> RIC;
 extern std::vector<Eigen::Vector3d> TIC;
+extern Eigen::Matrix3d center_R_imu;
+extern Eigen::Vector3d center_T_imu;
 extern Eigen::Vector3d G;
 
 extern double BIAS_ACC_THRESHOLD;

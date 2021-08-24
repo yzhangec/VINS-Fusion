@@ -57,12 +57,16 @@ int ROW;
 int COL;
 int DEBUG_IMAGE;
 
+int R_BUFFER_LENGTH;
+int T_BUFFER_LENGTH;
+
 camodocal::CameraPtr m_camera;
 Eigen::Vector3d tic;
 Eigen::Matrix3d qic;
 ros::Publisher pub_match_img;
 ros::Publisher pub_camera_pose_visual;
 ros::Publisher pub_odometry_rect;
+ros::Publisher camera_pose_pub;
 
 std::string BRIEF_PATTERN_FILE;
 std::string POSE_GRAPH_SAVE_PATH;
@@ -111,7 +115,7 @@ void image_callback(const sensor_msgs::ImageConstPtr &image_msg)
     else if (image_msg->header.stamp.toSec() - last_image_time > 1.0 || image_msg->header.stamp.toSec() < last_image_time)
     {
         ROS_WARN("image discontinue! detect a new sequence!");
-        new_sequence();
+        // new_sequence();
     }
     last_image_time = image_msg->header.stamp.toSec();
 }
@@ -227,6 +231,18 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
     cameraposevisual.publish_by(pub_camera_pose_visual, pose_msg->header);
 
 
+
+    geometry_msgs::PoseStamped pose;
+    pose.header = pose_msg->header;
+    pose.pose.position.x = vio_t_cam.x();
+    pose.pose.position.y = vio_t_cam.y();
+    pose.pose.position.z = vio_t_cam.z();
+    pose.pose.orientation.x = vio_q_cam.x();
+    pose.pose.orientation.y = vio_q_cam.y();
+    pose.pose.orientation.z = vio_q_cam.z();
+    pose.pose.orientation.w = vio_q_cam.w();
+    camera_pose_pub.publish(pose);
+
 }
 
 void extrinsic_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
@@ -244,6 +260,8 @@ void extrinsic_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
 
 void process()
 {
+    int cnt = 0;
+
     while (true)
     {
         sensor_msgs::ImageConstPtr image_msg = NULL;
@@ -360,7 +378,7 @@ void process()
                     //printf("u %f, v %f \n", p_2d_uv.x, p_2d_uv.y);
                 }
 
-                KeyFrame* keyframe = new KeyFrame(pose_msg->header.stamp.toSec(), frame_index, T, R, image,
+                KeyFrame* keyframe = new KeyFrame(pose_msg->header.stamp, frame_index, T, R, image,
                                    point_3d, point_2d_uv, point_2d_normal, point_id, sequence);   
                 m_process.lock();
                 start_flag = 1;
@@ -369,6 +387,48 @@ void process()
                 frame_index++;
                 last_t = T;
             }
+        }
+
+        cnt = (cnt + 1) % 20;
+
+        if(cnt == 0) {
+
+            Eigen::Matrix3d w_R_vio_pub;
+            posegraph.w_Q_vio_queue.push_back(posegraph.pg_yaw_vio);
+            posegraph.w_t_vio_queue.push_back(posegraph.pg_t_vio);
+            while(posegraph.w_Q_vio_queue.size()>posegraph.R_buffer_length) posegraph.w_Q_vio_queue.pop_front();
+            while(posegraph.w_t_vio_queue.size()>posegraph.T_buffer_length) posegraph.w_t_vio_queue.pop_front();
+
+            int size_q = posegraph.w_Q_vio_queue.size();
+            int size_tt = posegraph.w_t_vio_queue.size();
+            
+            double yaw_temp = 0.0;
+
+            for(auto it = posegraph.w_Q_vio_queue.begin(); it != posegraph.w_Q_vio_queue.end(); it++){
+                yaw_temp= yaw_temp + (*it) / size_q;
+            }
+
+            Eigen::Vector3d pg_t_vio_pub = Eigen::Vector3d::Zero();
+
+            for(auto it = posegraph.w_t_vio_queue.begin(); it != posegraph.w_t_vio_queue.end(); it++){
+                pg_t_vio_pub = pg_t_vio_pub + (*it) / size_tt;
+            }
+
+            w_R_vio_pub << cos(yaw_temp), -sin(yaw_temp), 0,
+                        sin(yaw_temp), cos(yaw_temp), 0,
+                        0,0,1;
+            Eigen::Quaterniond pg_q_vio_pub(w_R_vio_pub);
+
+            posegraph.pg_T_vio.position.x = pg_t_vio_pub.x();
+            posegraph.pg_T_vio.position.y = pg_t_vio_pub.y();
+            posegraph.pg_T_vio.position.z = pg_t_vio_pub.z();
+            posegraph.pg_T_vio.orientation.w = pg_q_vio_pub.w();
+            posegraph.pg_T_vio.orientation.x = pg_q_vio_pub.x();
+            posegraph.pg_T_vio.orientation.y = pg_q_vio_pub.y();
+            posegraph.pg_T_vio.orientation.z = pg_q_vio_pub.z();
+
+            posegraph.pub_pg_T_vio.publish(posegraph.pg_T_vio);
+
         }
         std::chrono::milliseconds dura(5);
         std::this_thread::sleep_for(dura);
@@ -454,6 +514,11 @@ int main(int argc, char **argv)
     fsSettings["output_path"] >> VINS_RESULT_PATH;
     fsSettings["save_image"] >> DEBUG_IMAGE;
 
+    fsSettings["pg_R_vio_buffer_length"] >> R_BUFFER_LENGTH;
+    fsSettings["pg_t_vio_buffer_length"] >> T_BUFFER_LENGTH;
+    posegraph.R_buffer_length = R_BUFFER_LENGTH;
+    posegraph.T_buffer_length = T_BUFFER_LENGTH;
+
     LOAD_PREVIOUS_POSE_GRAPH = fsSettings["load_previous_pose_graph"];
     VINS_RESULT_PATH = VINS_RESULT_PATH + "/vio_loop.csv";
     std::ofstream fout(VINS_RESULT_PATH, std::ios::out);
@@ -485,6 +550,7 @@ int main(int argc, char **argv)
     ros::Subscriber sub_point = n.subscribe("/vins_estimator/keyframe_point", 2000, point_callback);
     ros::Subscriber sub_margin_point = n.subscribe("/vins_estimator/margin_cloud", 2000, margin_point_callback);
 
+    camera_pose_pub = n.advertise<geometry_msgs::PoseStamped>("/loop_fusion/camera_pose", 1000);
     pub_match_img = n.advertise<sensor_msgs::Image>("match_image", 1000);
     pub_camera_pose_visual = n.advertise<visualization_msgs::MarkerArray>("camera_pose_visual", 1000);
     pub_point_cloud = n.advertise<sensor_msgs::PointCloud>("point_cloud_loop_rect", 1000);

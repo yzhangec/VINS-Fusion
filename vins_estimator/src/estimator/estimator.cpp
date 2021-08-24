@@ -47,8 +47,10 @@ void Estimator::setParameter()
     }
 }
 
-void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
+void Estimator::inputImage(ros::Time time_stamp, const cv::Mat &_img, const cv::Mat &_img1)
 {
+    
+    double t = time_stamp.toSec();
     inputImageCnt++;
     map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> featureFrame;
     TicToc featureTrackerTime;
@@ -56,25 +58,25 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
         featureFrame = featureTracker.trackImage(t, _img);
     else
         featureFrame = featureTracker.trackImage(t, _img, _img1);
-    //printf("featureTracker time: %f\n", featureTrackerTime.toc());
+    // printf("featureTracker time: %f\n", featureTrackerTime.toc());
     
     if(MULTIPLE_THREAD)  
     {     
         if(inputImageCnt % 2 == 0)
         {
             mBuf.lock();
-            featureBuf.push(make_pair(t, featureFrame));
+            featureBuf.push(make_pair(time_stamp, featureFrame));
             mBuf.unlock();
         }
     }
     else
     {
         mBuf.lock();
-        featureBuf.push(make_pair(t, featureFrame));
+        featureBuf.push(make_pair(time_stamp, featureFrame));
         mBuf.unlock();
         TicToc processTime;
         processMeasurements();
-        printf("process time: %f\n", processTime.toc());
+        // printf("process time: %f\n", processTime.toc());
     }
     
 }
@@ -89,13 +91,13 @@ void Estimator::inputIMU(double t, const Vector3d &linearAcceleration, const Vec
 
     fastPredictIMU(t, linearAcceleration, angularVelocity);
     if (solver_flag == NON_LINEAR)
-        pubLatestOdometry(latest_P, latest_Q, latest_V, t);
+        pubLatestOdometry(latest_P, latest_Q, latest_V, un_acc, un_gyr, ric[0], tic[0], t);
 }
 
-void Estimator::inputFeature(double t, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &featureFrame)
+void Estimator::inputFeature(ros::Time time_stamp, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &featureFrame)
 {
     mBuf.lock();
-    featureBuf.push(make_pair(t, featureFrame));
+    featureBuf.push(make_pair(time_stamp, featureFrame));
     mBuf.unlock();
 
     if(!MULTIPLE_THREAD)
@@ -151,15 +153,17 @@ void Estimator::processMeasurements()
     while (1)
     {
         //printf("process measurments\n");
-        pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > feature;
+        pair<ros::Time, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > feature;
         vector<pair<double, Eigen::Vector3d>> accVector, gyrVector;
+
         if(!featureBuf.empty())
         {
+            TicToc process_time;
             feature = featureBuf.front();
-            curTime = feature.first + td;
+            curTime = feature.first.toSec() + td;
             while(1)
             {
-                if ((!USE_IMU  || IMUAvailable(feature.first + td)))
+                if ((!USE_IMU  || IMUAvailable(feature.first.toSec() + td)))
                     break;
                 else
                 {
@@ -194,14 +198,14 @@ void Estimator::processMeasurements()
                 }
             }
 
-            processImage(feature.second, feature.first);
+            processImage(feature.second, feature.first.toSec());
             prevTime = curTime;
 
             printStatistics(*this, 0);
 
             std_msgs::Header header;
             header.frame_id = "world";
-            header.stamp = ros::Time(feature.first);
+            header.stamp = feature.first;
 
             pubOdometry(*this, header);
             pubKeyPoses(*this, header);
@@ -209,6 +213,7 @@ void Estimator::processMeasurements()
             pubPointCloud(*this, header);
             pubKeyframe(*this);
             pubTF(*this, header);
+            // printf("process time: %f\n", process_time.toc());
         }
 
         if (! MULTIPLE_THREAD)
@@ -1495,10 +1500,10 @@ void Estimator::fastPredictIMU(double t, Eigen::Vector3d linear_acceleration, Ei
     double dt = t - latest_time;
     latest_time = t;
     Eigen::Vector3d un_acc_0 = latest_Q * (latest_acc_0 - latest_Ba) - g;
-    Eigen::Vector3d un_gyr = 0.5 * (latest_gyr_0 + angular_velocity) - latest_Bg;
+    un_gyr = 0.5 * (latest_gyr_0 + angular_velocity) - latest_Bg;
     latest_Q = latest_Q * Utility::deltaQ(un_gyr * dt);
     Eigen::Vector3d un_acc_1 = latest_Q * (linear_acceleration - latest_Ba) - g;
-    Eigen::Vector3d un_acc = 0.5 * (un_acc_0 + un_acc_1);
+    un_acc = 0.5 * (un_acc_0 + un_acc_1);
     latest_P = latest_P + dt * latest_V + 0.5 * dt * dt * un_acc;
     latest_V = latest_V + dt * un_acc;
     latest_acc_0 = linear_acceleration;

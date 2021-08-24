@@ -23,6 +23,7 @@
 #include <nav_msgs/Path.h>
 #include <geometry_msgs/PointStamped.h>
 #include <nav_msgs/Odometry.h>
+#include <std_msgs/Empty.h>
 #include <stdio.h>
 #include <ros/ros.h>
 #include "keyframe.h"
@@ -56,6 +57,12 @@ public:
 	KeyFrame* getKeyFrame(int index);
 	nav_msgs::Path path[10];
 	nav_msgs::Path base_path;
+	geometry_msgs::Pose pg_T_vio;
+	std::deque<double> w_Q_vio_queue;
+    std::deque<Eigen::Vector3d> w_t_vio_queue;
+    Eigen::Vector3d pg_t_vio;
+    double pg_yaw_vio;
+
 	CameraPoseVisualization* posegraph_visualization;
 	void savePoseGraph();
 	void loadPoseGraph();
@@ -66,6 +73,12 @@ public:
 	// world frame( base sequence or first sequence)<----> cur sequence frame  
 	Vector3d w_t_vio;
 	Matrix3d w_r_vio;
+
+	int R_buffer_length, T_buffer_length;
+
+	ros::Publisher pub_pg_T_vio;
+	ros::Publisher pub_opt;
+	//ros::Publisher pub_last_pg_pose;
 
 
 private:
@@ -97,6 +110,7 @@ private:
 	ros::Publisher pub_base_path;
 	ros::Publisher pub_pose_graph;
 	ros::Publisher pub_path[10];
+	
 };
 
 template <typename T> inline

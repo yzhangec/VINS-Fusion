@@ -33,5 +33,7 @@ extern int ROW;
 extern int COL;
 extern std::string VINS_RESULT_PATH;
 extern int DEBUG_IMAGE;
+extern int R_BUFFER_LENGTH;
+extern int T_BUFFER_LENGTH;
 
 
