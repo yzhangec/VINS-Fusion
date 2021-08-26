@@ -251,7 +251,6 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
 
 	keyframelist.push_back(cur_kf);
     publish();
-    pub_opt.publish(path[1]);
 	m_keyframelist.unlock();
 }
 
@@ -617,6 +616,7 @@ void PoseGraph::optimize4DoF()
             }
             m_keyframelist.unlock();
             updatePath();
+            pub_opt.publish(path[1]);
         }
 
         std::chrono::milliseconds dura(2000);
