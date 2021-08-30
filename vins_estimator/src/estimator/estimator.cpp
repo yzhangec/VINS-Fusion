@@ -62,12 +62,12 @@ void Estimator::inputImage(ros::Time time_stamp, const cv::Mat &_img, const cv::
     
     if(MULTIPLE_THREAD)  
     {     
-        if(inputImageCnt % 2 == 0)
-        {
+        // if(inputImageCnt % 2 == 0)
+        // {
             mBuf.lock();
             featureBuf.push(make_pair(time_stamp, featureFrame));
             mBuf.unlock();
-        }
+        // }
     }
     else
     {
