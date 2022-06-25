@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
     image_transport)
 
 find_package(OpenCV REQUIRED)
+find_package(PCL 1.7 REQUIRED)
 
 # message(WARNING "OpenCV_VERSION: ${OpenCV_VERSION}")
 
@@ -29,7 +30,10 @@ find_package(Eigen3)
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
+  ${PCL_INCLUDE_DIRS}
 )
+
+link_directories(${PCL_LIBRARY_DIRS})
 
 catkin_package()
 
