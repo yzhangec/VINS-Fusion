@@ -9,29 +9,29 @@
  * Author: Qin Tong (qintonguav@gmail.com)
  *******************************************************/
 
+#include "keyframe.h"
+#include "parameters.h"
+#include "pose_graph.h"
+#include "utility/CameraPoseVisualization.h"
+#include "utility/tic_toc.h"
 #include <cv_bridge/cv_bridge.h>
+#include <eigen3/Eigen/Dense>
+#include <iostream>
+#include <mutex>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
+#include <opencv2/core/eigen.hpp>
+#include <opencv2/opencv.hpp>
+#include <queue>
 #include <ros/package.h>
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/PointCloud.h>
 #include <sensor_msgs/image_encodings.h>
 #include <std_msgs/Bool.h>
-#include <visualization_msgs/Marker.h>
-#include <eigen3/Eigen/Dense>
-#include <iostream>
-#include <mutex>
-#include <opencv2/core/eigen.hpp>
-#include <opencv2/opencv.hpp>
-#include <queue>
 #include <thread>
 #include <vector>
-#include "keyframe.h"
-#include "parameters.h"
-#include "pose_graph.h"
-#include "utility/CameraPoseVisualization.h"
-#include "utility/tic_toc.h"
+#include <visualization_msgs/Marker.h>
 #define SKIP_FIRST_CNT 10
 using namespace std;
 
@@ -84,10 +84,14 @@ void new_sequence() {
   posegraph.posegraph_visualization->reset();
   posegraph.publish();
   m_buf.lock();
-  while (!image_buf.empty()) image_buf.pop();
-  while (!point_buf.empty()) point_buf.pop();
-  while (!pose_buf.empty()) pose_buf.pop();
-  while (!odometry_buf.empty()) odometry_buf.pop();
+  while (!image_buf.empty())
+    image_buf.pop();
+  while (!point_buf.empty())
+    point_buf.pop();
+  while (!pose_buf.empty())
+    pose_buf.pop();
+  while (!odometry_buf.empty())
+    odometry_buf.pop();
   m_buf.unlock();
 }
 
@@ -248,7 +252,8 @@ void process() {
                  point_buf.back()->header.stamp.toSec() >= pose_buf.front()->header.stamp.toSec()) {
         pose_msg = pose_buf.front();
         pose_buf.pop();
-        while (!pose_buf.empty()) pose_buf.pop();
+        while (!pose_buf.empty())
+          pose_buf.pop();
         while (image_buf.front()->header.stamp.toSec() < pose_msg->header.stamp.toSec())
           image_buf.pop();
         image_msg = image_buf.front();
@@ -356,7 +361,8 @@ void command() {
       printf("program shutting down...\n");
       ros::shutdown();
     }
-    if (c == 'n') new_sequence();
+    if (c == 'n')
+      new_sequence();
 
     std::chrono::milliseconds dura(5);
     std::this_thread::sleep_for(dura);
@@ -374,10 +380,9 @@ int main(int argc, char **argv) {
   SKIP_DIS = 0;
 
   if (argc != 2) {
-    printf(
-        "please intput: rosrun loop_fusion loop_fusion_node [config file] \n"
-        "for example: rosrun loop_fusion loop_fusion_node "
-        "/home/tony-ws1/catkin_ws/src/VINS-Fusion/config/euroc/euroc_stereo_imu_config.yaml \n");
+    printf("please intput: rosrun loop_fusion loop_fusion_node [config file] \n"
+           "for example: rosrun loop_fusion loop_fusion_node "
+           "/home/tony-ws1/catkin_ws/src/VINS-Fusion/config/euroc/euroc_stereo_imu_config.yaml \n");
     return 0;
   }
 
