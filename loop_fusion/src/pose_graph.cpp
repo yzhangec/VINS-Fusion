@@ -30,7 +30,7 @@ PoseGraph::PoseGraph() {
 
 PoseGraph::~PoseGraph() { t_optimization.detach(); }
 
-void PoseGraph::registerPub(ros::NodeHandle& n) {
+void PoseGraph::registerPub(ros::NodeHandle &n) {
   // nav_msgs::Path, geometry_msgs/PoseStamped[] poses
   pub_pg_path = n.advertise<nav_msgs::Path>("pose_graph_path", 1000);
   pub_base_path = n.advertise<nav_msgs::Path>("base_path", 1000);
@@ -56,7 +56,7 @@ void PoseGraph::loadVocabulary(std::string voc_path) {
   db.setVocabulary(*voc, false, 0);
 }
 
-void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop) {
+void PoseGraph::addKeyFrame(KeyFrame *cur_kf, bool flag_detect_loop) {
   // shift to base frame
   Vector3d vio_P_cur;
   Matrix3d vio_R_cur;
@@ -86,7 +86,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop) {
   }
   if (loop_index != -1) {
     printf(" %d detect loop with %d \n", cur_kf->index, loop_index);
-    KeyFrame* old_kf = getKeyFrame(loop_index);
+    KeyFrame *old_kf = getKeyFrame(loop_index);
 
     if (cur_kf->findConnection(old_kf)) {
       if (earliest_loop_index > loop_index || earliest_loop_index == -1)
@@ -102,7 +102,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop) {
       relative_t = cur_kf->getLoopRelativeT();
       relative_q = (cur_kf->getLoopRelativeQ()).toRotationMatrix();
       w_P_cur = w_R_old * relative_t + w_P_old;
-      w_R_cur = w_R_old * relative_q; //relative_q = old_R_cur = w_R_old.transpose() * w_R_cur
+      w_R_cur = w_R_old * relative_q; // relative_q = old_R_cur = w_R_old.transpose() * w_R_cur
       double shift_yaw;
       Matrix3d shift_r;
       Vector3d shift_t;
@@ -110,8 +110,9 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop) {
         shift_yaw = Utility::R2ypr(w_R_cur).x() - Utility::R2ypr(vio_R_cur).x();
         shift_r = Utility::ypr2R(Vector3d(shift_yaw, 0, 0));
       } else
-        shift_r = w_R_cur * vio_R_cur.transpose(); //w_R_vio
-      shift_t = w_P_cur - w_R_cur * vio_R_cur.transpose() * vio_P_cur; // w_P_vio = w_P_cur - vio_P_cur
+        shift_r = w_R_cur * vio_R_cur.transpose(); // w_R_vio
+      shift_t =
+          w_P_cur - w_R_cur * vio_R_cur.transpose() * vio_P_cur; // w_P_vio = w_P_cur - vio_P_cur
       // shift vio pose of whole sequence to the world frame
       if (old_kf->sequence != cur_kf->sequence && sequence_loop[cur_kf->sequence] == 0) {
         w_r_vio = shift_r;
@@ -119,7 +120,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop) {
         vio_P_cur = w_r_vio * vio_P_cur + w_t_vio;
         vio_R_cur = w_r_vio * vio_R_cur;
         cur_kf->updateVioPose(vio_P_cur, vio_R_cur);
-        list<KeyFrame*>::iterator it = keyframelist.begin();
+        list<KeyFrame *>::iterator it = keyframelist.begin();
         for (; it != keyframelist.end(); it++) {
           if ((*it)->sequence == cur_kf->sequence) {
             Vector3d vio_P_cur;
@@ -170,9 +171,10 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop) {
   }
   // draw local connection
   if (SHOW_S_EDGE) {
-    list<KeyFrame*>::reverse_iterator rit = keyframelist.rbegin();
+    list<KeyFrame *>::reverse_iterator rit = keyframelist.rbegin();
     for (int i = 0; i < 4; i++) {
-      if (rit == keyframelist.rend()) break;
+      if (rit == keyframelist.rend())
+        break;
       Vector3d conncected_P;
       Matrix3d connected_R;
       if ((*rit)->sequence == cur_kf->sequence) {
@@ -185,7 +187,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop) {
   if (SHOW_L_EDGE) {
     if (cur_kf->has_loop) {
       // printf("has loop \n");
-      KeyFrame* connected_KF = getKeyFrame(cur_kf->loop_index);
+      KeyFrame *connected_KF = getKeyFrame(cur_kf->loop_index);
       Vector3d connected_P, P0;
       Matrix3d connected_R, R0;
       connected_KF->getPose(connected_P, connected_R);
@@ -206,7 +208,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop) {
   m_keyframelist.unlock();
 }
 
-void PoseGraph::loadKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop) {
+void PoseGraph::loadKeyFrame(KeyFrame *cur_kf, bool flag_detect_loop) {
   cur_kf->index = global_index;
   global_index++;
   int loop_index = -1;
@@ -217,7 +219,7 @@ void PoseGraph::loadKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop) {
   }
   if (loop_index != -1) {
     printf(" %d detect loop with %d \n", cur_kf->index, loop_index);
-    KeyFrame* old_kf = getKeyFrame(loop_index);
+    KeyFrame *old_kf = getKeyFrame(loop_index);
     if (cur_kf->findConnection(old_kf)) {
       if (earliest_loop_index > loop_index || earliest_loop_index == -1)
         earliest_loop_index = loop_index;
@@ -246,9 +248,10 @@ void PoseGraph::loadKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop) {
 
   // draw local connection
   if (SHOW_S_EDGE) {
-    list<KeyFrame*>::reverse_iterator rit = keyframelist.rbegin();
+    list<KeyFrame *>::reverse_iterator rit = keyframelist.rbegin();
     for (int i = 0; i < 1; i++) {
-      if (rit == keyframelist.rend()) break;
+      if (rit == keyframelist.rend())
+        break;
       Vector3d conncected_P;
       Matrix3d connected_R;
       if ((*rit)->sequence == cur_kf->sequence) {
@@ -274,11 +277,12 @@ void PoseGraph::loadKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop) {
   m_keyframelist.unlock();
 }
 
-KeyFrame* PoseGraph::getKeyFrame(int index) {
+KeyFrame *PoseGraph::getKeyFrame(int index) {
   //    unique_lock<mutex> lock(m_keyframelist);
-  list<KeyFrame*>::iterator it = keyframelist.begin();
+  list<KeyFrame *>::iterator it = keyframelist.begin();
   for (; it != keyframelist.end(); it++) {
-    if ((*it)->index == index) break;
+    if ((*it)->index == index)
+      break;
   }
   if (it != keyframelist.end())
     return *it;
@@ -286,7 +290,7 @@ KeyFrame* PoseGraph::getKeyFrame(int index) {
     return NULL;
 }
 
-int PoseGraph::detectLoop(KeyFrame* keyframe, int frame_index) {
+int PoseGraph::detectLoop(KeyFrame *keyframe, int frame_index) {
   // put image into image_pool; for visualization
   cv::Mat compressed_image;
   if (DEBUG_IMAGE) {
@@ -354,14 +358,15 @@ int PoseGraph::detectLoop(KeyFrame* keyframe, int frame_index) {
   if (find_loop && frame_index > 50) {
     int min_index = -1;
     for (unsigned int i = 0; i < ret.size(); i++) {
-      if (min_index == -1 || (ret[i].Id < min_index && ret[i].Score > 0.015)) min_index = ret[i].Id;
+      if (min_index == -1 || (ret[i].Id < min_index && ret[i].Score > 0.015))
+        min_index = ret[i].Id;
     }
     return min_index;
   } else
     return -1;
 }
 
-void PoseGraph::addKeyFrameIntoVoc(KeyFrame* keyframe) {
+void PoseGraph::addKeyFrameIntoVoc(KeyFrame *keyframe) {
   // put image into image_pool; for visualization
   cv::Mat compressed_image;
   if (DEBUG_IMAGE) {
@@ -390,7 +395,7 @@ void PoseGraph::optimize4DoF() {
       printf("optimize pose graph \n");
       TicToc tmp_t;
       m_keyframelist.lock();
-      KeyFrame* cur_kf = getKeyFrame(cur_index);
+      KeyFrame *cur_kf = getKeyFrame(cur_index);
 
       int max_length = cur_index + 1;
 
@@ -407,17 +412,18 @@ void PoseGraph::optimize4DoF() {
       // options.max_solver_time_in_seconds = SOLVER_TIME * 3;
       options.max_num_iterations = 5;
       ceres::Solver::Summary summary;
-      ceres::LossFunction* loss_function;
+      ceres::LossFunction *loss_function;
       loss_function = new ceres::HuberLoss(0.1);
       // loss_function = new ceres::CauchyLoss(1.0);
-      ceres::LocalParameterization* angle_local_parameterization =
+      ceres::LocalParameterization *angle_local_parameterization =
           AngleLocalParameterization::Create();
 
-      list<KeyFrame*>::iterator it;
+      list<KeyFrame *>::iterator it;
 
       int i = 0;
       for (it = keyframelist.begin(); it != keyframelist.end(); it++) {
-        if ((*it)->index < first_looped_index) continue;
+        if ((*it)->index < first_looped_index)
+          continue;
         (*it)->local_index = i;
         Quaterniond tmp_q;
         Matrix3d tmp_r;
@@ -453,7 +459,7 @@ void PoseGraph::optimize4DoF() {
                                 t_array[i][2] - t_array[i - j][2]);
             relative_t = q_array[i - j].inverse() * relative_t;
             double relative_yaw = euler_array[i][0] - euler_array[i - j][0];
-            ceres::CostFunction* cost_function =
+            ceres::CostFunction *cost_function =
                 FourDOFError::Create(relative_t.x(), relative_t.y(), relative_t.z(), relative_yaw,
                                      euler_conncected.y(), euler_conncected.z());
             problem.AddResidualBlock(cost_function, NULL, euler_array[i - j], t_array[i - j],
@@ -470,14 +476,15 @@ void PoseGraph::optimize4DoF() {
           Vector3d relative_t;
           relative_t = (*it)->getLoopRelativeT();
           double relative_yaw = (*it)->getLoopRelativeYaw();
-          ceres::CostFunction* cost_function =
+          ceres::CostFunction *cost_function =
               FourDOFWeightError::Create(relative_t.x(), relative_t.y(), relative_t.z(),
                                          relative_yaw, euler_conncected.y(), euler_conncected.z());
           problem.AddResidualBlock(cost_function, loss_function, euler_array[connected_index],
                                    t_array[connected_index], euler_array[i], t_array[i]);
         }
 
-        if ((*it)->index == cur_index) break;
+        if ((*it)->index == cur_index)
+          break;
         i++;
       }
       m_keyframelist.unlock();
@@ -495,14 +502,16 @@ void PoseGraph::optimize4DoF() {
       m_keyframelist.lock();
       i = 0;
       for (it = keyframelist.begin(); it != keyframelist.end(); it++) {
-        if ((*it)->index < first_looped_index) continue;
+        if ((*it)->index < first_looped_index)
+          continue;
         Quaterniond tmp_q;
         tmp_q = Utility::ypr2R(Vector3d(euler_array[i][0], euler_array[i][1], euler_array[i][2]));
         Vector3d tmp_t = Vector3d(t_array[i][0], t_array[i][1], t_array[i][2]);
         Matrix3d tmp_r = tmp_q.toRotationMatrix();
         (*it)->updatePose(tmp_t, tmp_r);
 
-        if ((*it)->index == cur_index) break;
+        if ((*it)->index == cur_index)
+          break;
         i++;
       }
 
@@ -553,7 +562,7 @@ void PoseGraph::optimize6DoF() {
       printf("optimize pose graph \n");
       TicToc tmp_t;
       m_keyframelist.lock();
-      KeyFrame* cur_kf = getKeyFrame(cur_index);
+      KeyFrame *cur_kf = getKeyFrame(cur_index);
 
       int max_length = cur_index + 1;
 
@@ -569,17 +578,18 @@ void PoseGraph::optimize6DoF() {
       // options.max_solver_time_in_seconds = SOLVER_TIME * 3;
       options.max_num_iterations = 5;
       ceres::Solver::Summary summary;
-      ceres::LossFunction* loss_function;
+      ceres::LossFunction *loss_function;
       loss_function = new ceres::HuberLoss(0.1);
       // loss_function = new ceres::CauchyLoss(1.0);
-      ceres::LocalParameterization* local_parameterization =
+      ceres::LocalParameterization *local_parameterization =
           new ceres::QuaternionParameterization();
 
-      list<KeyFrame*>::iterator it;
+      list<KeyFrame *>::iterator it;
 
       int i = 0;
       for (it = keyframelist.begin(); it != keyframelist.end(); it++) {
-        if ((*it)->index < first_looped_index) continue;
+        if ((*it)->index < first_looped_index)
+          continue;
         (*it)->local_index = i;
         Quaterniond tmp_q;
         Matrix3d tmp_r;
@@ -616,7 +626,7 @@ void PoseGraph::optimize6DoF() {
                 Quaterniond(q_array[i][0], q_array[i][1], q_array[i][2], q_array[i][3]);
             relative_t = q_i_j.inverse() * relative_t;
             Quaterniond relative_q = q_i_j.inverse() * q_i;
-            ceres::CostFunction* vo_function = RelativeRTError::Create(
+            ceres::CostFunction *vo_function = RelativeRTError::Create(
                 relative_t.x(), relative_t.y(), relative_t.z(), relative_q.w(), relative_q.x(),
                 relative_q.y(), relative_q.z(), 0.1, 0.01);
             problem.AddResidualBlock(vo_function, NULL, q_array[i - j], t_array[i - j], q_array[i],
@@ -633,14 +643,15 @@ void PoseGraph::optimize6DoF() {
           relative_t = (*it)->getLoopRelativeT();
           Quaterniond relative_q;
           relative_q = (*it)->getLoopRelativeQ();
-          ceres::CostFunction* loop_function = RelativeRTError::Create(
+          ceres::CostFunction *loop_function = RelativeRTError::Create(
               relative_t.x(), relative_t.y(), relative_t.z(), relative_q.w(), relative_q.x(),
               relative_q.y(), relative_q.z(), 0.1, 0.01);
           problem.AddResidualBlock(loop_function, loss_function, q_array[connected_index],
                                    t_array[connected_index], q_array[i], t_array[i]);
         }
 
-        if ((*it)->index == cur_index) break;
+        if ((*it)->index == cur_index)
+          break;
         i++;
       }
       m_keyframelist.unlock();
@@ -658,13 +669,15 @@ void PoseGraph::optimize6DoF() {
       m_keyframelist.lock();
       i = 0;
       for (it = keyframelist.begin(); it != keyframelist.end(); it++) {
-        if ((*it)->index < first_looped_index) continue;
+        if ((*it)->index < first_looped_index)
+          continue;
         Quaterniond tmp_q(q_array[i][0], q_array[i][1], q_array[i][2], q_array[i][3]);
         Vector3d tmp_t = Vector3d(t_array[i][0], t_array[i][1], t_array[i][2]);
         Matrix3d tmp_r = tmp_q.toRotationMatrix();
         (*it)->updatePose(tmp_t, tmp_r);
 
-        if ((*it)->index == cur_index) break;
+        if ((*it)->index == cur_index)
+          break;
         i++;
       }
 
@@ -700,7 +713,7 @@ void PoseGraph::optimize6DoF() {
 
 void PoseGraph::updatePath() {
   m_keyframelist.lock();
-  list<KeyFrame*>::iterator it;
+  list<KeyFrame *>::iterator it;
   for (int i = 1; i <= sequence_cnt; i++) {
     path[i].poses.clear();
   }
@@ -750,14 +763,15 @@ void PoseGraph::updatePath() {
     }
     // draw local connection
     if (SHOW_S_EDGE) {
-      list<KeyFrame*>::reverse_iterator rit = keyframelist.rbegin();
-      list<KeyFrame*>::reverse_iterator lrit;
+      list<KeyFrame *>::reverse_iterator rit = keyframelist.rbegin();
+      list<KeyFrame *>::reverse_iterator lrit;
       for (; rit != keyframelist.rend(); rit++) {
         if ((*rit)->index == (*it)->index) {
           lrit = rit;
           lrit++;
           for (int i = 0; i < 4; i++) {
-            if (lrit == keyframelist.rend()) break;
+            if (lrit == keyframelist.rend())
+              break;
             if ((*lrit)->sequence == (*it)->sequence) {
               Vector3d conncected_P;
               Matrix3d connected_R;
@@ -772,7 +786,7 @@ void PoseGraph::updatePath() {
     }
     if (SHOW_L_EDGE) {
       if ((*it)->has_loop && (*it)->sequence == sequence_cnt) {
-        KeyFrame* connected_KF = getKeyFrame((*it)->loop_index);
+        KeyFrame *connected_KF = getKeyFrame((*it)->loop_index);
         Vector3d connected_P;
         Matrix3d connected_R;
         connected_KF->getPose(connected_P, connected_R);
@@ -793,13 +807,13 @@ void PoseGraph::updatePath() {
 void PoseGraph::savePoseGraph() {
   m_keyframelist.lock();
   TicToc tmp_t;
-  FILE* pFile;
+  FILE *pFile;
   printf("pose graph path: %s\n", POSE_GRAPH_SAVE_PATH.c_str());
   printf("pose graph saving... \n");
   string file_path = POSE_GRAPH_SAVE_PATH + "pose_graph.txt";
   pFile = fopen(file_path.c_str(), "w");
   // fprintf(pFile, "index time_stamp Tx Ty Tz Qw Qx Qy Qz loop_index loop_info\n");
-  list<KeyFrame*>::iterator it;
+  list<KeyFrame *>::iterator it;
   for (it = keyframelist.begin(); it != keyframelist.end(); it++) {
     std::string image_path, descriptor_path, brief_path, keypoints_path;
     if (DEBUG_IMAGE) {
@@ -826,7 +840,7 @@ void PoseGraph::savePoseGraph() {
     brief_path = POSE_GRAPH_SAVE_PATH + to_string((*it)->index) + "_briefdes.dat";
     std::ofstream brief_file(brief_path, std::ios::binary);
     keypoints_path = POSE_GRAPH_SAVE_PATH + to_string((*it)->index) + "_keypoints.txt";
-    FILE* keypoints_file;
+    FILE *keypoints_file;
     keypoints_file = fopen(keypoints_path.c_str(), "w");
     for (int i = 0; i < (int)(*it)->keypoints.size(); i++) {
       brief_file << (*it)->brief_descriptors[i] << endl;
@@ -843,7 +857,7 @@ void PoseGraph::savePoseGraph() {
 }
 void PoseGraph::loadPoseGraph() {
   TicToc tmp_t;
-  FILE* pFile;
+  FILE *pFile;
   string file_path = POSE_GRAPH_SAVE_PATH + "pose_graph.txt";
   printf("lode pose graph from: %s \n", file_path.c_str());
   printf("pose graph loading...\n");
@@ -918,7 +932,7 @@ void PoseGraph::loadPoseGraph() {
     string brief_path = POSE_GRAPH_SAVE_PATH + to_string(index) + "_briefdes.dat";
     std::ifstream brief_file(brief_path, std::ios::binary);
     string keypoints_path = POSE_GRAPH_SAVE_PATH + to_string(index) + "_keypoints.txt";
-    FILE* keypoints_file;
+    FILE *keypoints_file;
     keypoints_file = fopen(keypoints_path.c_str(), "r");
     vector<cv::KeyPoint> keypoints;
     vector<cv::KeyPoint> keypoints_norm;
@@ -942,7 +956,7 @@ void PoseGraph::loadPoseGraph() {
     brief_file.close();
     fclose(keypoints_file);
 
-    KeyFrame* keyframe =
+    KeyFrame *keyframe =
         new KeyFrame(time_stamp, index, VIO_T, VIO_R, PG_T, PG_R, image, loop_index, loop_info,
                      keypoints, keypoints_norm, brief_descriptors);
     loadKeyFrame(keyframe, 0);

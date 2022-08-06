@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
     tf
     cv_bridge
     camera_models
+    pcl_ros
     image_transport)
 
 find_package(OpenCV REQUIRED)
@@ -29,6 +30,7 @@ find_package(Eigen3)
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
+  ${PCL_LIBRARIES}
 )
 
 catkin_package()
@@ -50,8 +52,7 @@ add_library(vins_lib
     src/initial/initial_sfm.cpp
     src/initial/initial_ex_rotation.cpp
     src/featureTracker/feature_tracker.cpp)
-target_link_libraries(vins_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES})
-
+target_link_libraries(vins_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(vins_node src/rosNodeTest.cpp)
 target_link_libraries(vins_node vins_lib) 

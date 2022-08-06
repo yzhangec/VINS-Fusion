@@ -33,16 +33,17 @@ size_t pub_counter = 0;
 
 void registerPub(ros::NodeHandle &n) {
   pub_latest_odometry = n.advertise<nav_msgs::Odometry>("imu_propagate", 1000);
-  pub_latest_camera_pose = n.advertise<geometry_msgs::PoseStamped>("imu_propagate_camera_pose", 1000);
+  pub_latest_camera_pose =
+      n.advertise<geometry_msgs::PoseStamped>("imu_propagate_camera_pose", 1000);
   pub_path = n.advertise<nav_msgs::Path>("path", 1000);
   pub_odometry = n.advertise<nav_msgs::Odometry>("odometry", 1000);
-  pub_point_cloud = n.advertise<sensor_msgs::PointCloud>("point_cloud", 1000);
-  pub_margin_cloud = n.advertise<sensor_msgs::PointCloud>("margin_cloud", 1000);
+  pub_point_cloud = n.advertise<sensor_msgs::PointCloud2>("point_cloud", 1000);
+  pub_margin_cloud = n.advertise<sensor_msgs::PointCloud2>("margin_cloud", 1000);
   pub_key_poses = n.advertise<visualization_msgs::Marker>("key_poses", 1000);
   pub_camera_pose = n.advertise<geometry_msgs::PoseStamped>("camera_pose", 1000);
   pub_camera_pose_visual = n.advertise<visualization_msgs::MarkerArray>("camera_pose_visual", 1000);
   pub_keyframe_pose = n.advertise<nav_msgs::Odometry>("keyframe_pose", 1000);
-  pub_keyframe_point = n.advertise<sensor_msgs::PointCloud>("keyframe_point", 1000);
+  pub_keyframe_point = n.advertise<sensor_msgs::PointCloud2>("keyframe_point", 1000);
   pub_extrinsic = n.advertise<nav_msgs::Odometry>("extrinsic", 1000);
   pub_image_track = n.advertise<sensor_msgs::Image>("image_track", 1000);
 
@@ -92,7 +93,8 @@ void pubTrackImage(const cv::Mat &imgTrack, const double t) {
 }
 
 void printStatistics(const Estimator &estimator, double t) {
-  if (estimator.solver_flag != Estimator::SolverFlag::NON_LINEAR) return;
+  if (estimator.solver_flag != Estimator::SolverFlag::NON_LINEAR)
+    return;
   // printf("position: %f, %f, %f\r", estimator.Ps[WINDOW_SIZE].x(), estimator.Ps[WINDOW_SIZE].y(),
   // estimator.Ps[WINDOW_SIZE].z());
   ROS_DEBUG_STREAM("position: " << estimator.Ps[WINDOW_SIZE].transpose());
@@ -127,7 +129,8 @@ void printStatistics(const Estimator &estimator, double t) {
   sum_of_path += (estimator.Ps[WINDOW_SIZE] - last_path).norm();
   last_path = estimator.Ps[WINDOW_SIZE];
   ROS_DEBUG("sum of path %f", sum_of_path);
-  if (ESTIMATE_TD) ROS_INFO("td %f", estimator.td);
+  if (ESTIMATE_TD)
+    ROS_INFO("td %f", estimator.td);
 }
 
 void pubOdometry(const Estimator &estimator, const std_msgs::Header &header) {
@@ -177,7 +180,8 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header) {
 }
 
 void pubKeyPoses(const Estimator &estimator, const std_msgs::Header &header) {
-  if (estimator.key_poses.size() == 0) return;
+  if (estimator.key_poses.size() == 0)
+    return;
   visualization_msgs::Marker key_poses;
   key_poses.header = header;
   key_poses.header.frame_id = "world";
@@ -188,7 +192,7 @@ void pubKeyPoses(const Estimator &estimator, const std_msgs::Header &header) {
   key_poses.lifetime = ros::Duration();
 
   // static int key_poses_id = 0;
-  key_poses.id = 0;  // key_poses_id++;
+  key_poses.id = 0; // key_poses_id++;
   key_poses.scale.x = 0.05;
   key_poses.scale.y = 0.05;
   key_poses.scale.z = 0.05;
@@ -240,36 +244,44 @@ void pubCameraPose(const Estimator &estimator, const std_msgs::Header &header) {
 }
 
 void pubPointCloud(const Estimator &estimator, const std_msgs::Header &header) {
-  sensor_msgs::PointCloud point_cloud, loop_point_cloud;
-  point_cloud.header = header;
-  loop_point_cloud.header = header;
+  pcl::PointCloud<pcl::PointXYZ> point_cloud;
 
   for (auto &it_per_id : estimator.f_manager.feature) {
     int used_num;
     used_num = it_per_id.feature_per_frame.size();
-    if (!(used_num >= 2 && it_per_id.start_frame < WINDOW_SIZE - 2)) continue;
-    if (it_per_id.start_frame > WINDOW_SIZE * 3.0 / 4.0 || it_per_id.solve_flag != 1) continue;
+    if (!(used_num >= 2 && it_per_id.start_frame < WINDOW_SIZE - 2))
+      continue;
+    if (it_per_id.start_frame > WINDOW_SIZE * 3.0 / 4.0 || it_per_id.solve_flag != 1)
+      continue;
     int imu_i = it_per_id.start_frame;
     Vector3d pts_i = it_per_id.feature_per_frame[0].point * it_per_id.estimated_depth;
     Vector3d w_pts_i =
         estimator.Rs[imu_i] * (estimator.ric[0] * pts_i + estimator.tic[0]) + estimator.Ps[imu_i];
 
-    geometry_msgs::Point32 p;
+    pcl::PointXYZ p;
     p.x = w_pts_i(0);
     p.y = w_pts_i(1);
     p.z = w_pts_i(2);
-    point_cloud.points.push_back(p);
+    point_cloud.push_back(p);
   }
-  pub_point_cloud.publish(point_cloud);
+
+  point_cloud.width = point_cloud.points.size();
+  point_cloud.height = 1;
+  point_cloud.is_dense = true;
+
+  sensor_msgs::PointCloud2 point_cloud_msg;
+  pcl::toROSMsg(point_cloud, point_cloud_msg);
+  point_cloud_msg.header = header;
+  pub_point_cloud.publish(point_cloud_msg);
 
   // pub margined potin
-  sensor_msgs::PointCloud margin_cloud;
-  margin_cloud.header = header;
+  pcl::PointCloud<pcl::PointXYZ> margin_cloud;
 
   for (auto &it_per_id : estimator.f_manager.feature) {
     int used_num;
     used_num = it_per_id.feature_per_frame.size();
-    if (!(used_num >= 2 && it_per_id.start_frame < WINDOW_SIZE - 2)) continue;
+    if (!(used_num >= 2 && it_per_id.start_frame < WINDOW_SIZE - 2))
+      continue;
     // if (it_per_id->start_frame > WINDOW_SIZE * 3.0 / 4.0 || it_per_id->solve_flag != 1)
     //        continue;
 
@@ -280,18 +292,27 @@ void pubPointCloud(const Estimator &estimator, const std_msgs::Header &header) {
       Vector3d w_pts_i =
           estimator.Rs[imu_i] * (estimator.ric[0] * pts_i + estimator.tic[0]) + estimator.Ps[imu_i];
 
-      geometry_msgs::Point32 p;
-      p.x = w_pts_i(0);
-      p.y = w_pts_i(1);
-      p.z = w_pts_i(2);
-      margin_cloud.points.push_back(p);
+      pcl::PointXYZ point;
+      point.x = w_pts_i(0);
+      point.y = w_pts_i(1);
+      point.z = w_pts_i(2);
+      margin_cloud.push_back(point);
     }
   }
-  pub_margin_cloud.publish(margin_cloud);
+
+  margin_cloud.width = margin_cloud.points.size();
+  margin_cloud.height = 1;
+  margin_cloud.is_dense = true;
+
+  sensor_msgs::PointCloud2 margin_cloud_msg;
+  pcl::toROSMsg(margin_cloud, margin_cloud_msg);
+  margin_cloud_msg.header = header;
+  pub_margin_cloud.publish(margin_cloud_msg);
 }
 
 void pubTF(const Estimator &estimator, const std_msgs::Header &header) {
-  if (estimator.solver_flag != Estimator::SolverFlag::NON_LINEAR) return;
+  if (estimator.solver_flag != Estimator::SolverFlag::NON_LINEAR)
+    return;
   static tf::TransformBroadcaster br;
   tf::Transform transform;
   tf::Quaternion q;
