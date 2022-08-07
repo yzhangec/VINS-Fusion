@@ -239,6 +239,7 @@ void process() {
     nav_msgs::Odometry::ConstPtr pose_msg = NULL;
 
     // find out the messages with same time stamp
+    // pose_msg, point_msg, image_msg
     m_buf.lock();
     if (!image_buf.empty() && !point_buf.empty() && !pose_buf.empty()) {
       if (image_buf.front()->header.stamp.toSec() > pose_buf.front()->header.stamp.toSec()) {

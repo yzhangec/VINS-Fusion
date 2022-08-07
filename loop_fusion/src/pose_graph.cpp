@@ -79,9 +79,11 @@ void PoseGraph::addKeyFrame(KeyFrame *cur_kf, bool flag_detect_loop) {
   global_index++;
   int loop_index = -1;
   if (flag_detect_loop) {
+    // addKeyFrame 2nd param, looks like only true is set
     TicToc tmp_t;
     loop_index = detectLoop(cur_kf, cur_kf->index);
   } else {
+    // used for loadKeyFrame
     addKeyFrameIntoVoc(cur_kf);
   }
   if (loop_index != -1) {
@@ -107,13 +109,14 @@ void PoseGraph::addKeyFrame(KeyFrame *cur_kf, bool flag_detect_loop) {
       Matrix3d shift_r;
       Vector3d shift_t;
       if (use_imu) {
+        // 4 DOF
         shift_yaw = Utility::R2ypr(w_R_cur).x() - Utility::R2ypr(vio_R_cur).x();
         shift_r = Utility::ypr2R(Vector3d(shift_yaw, 0, 0));
       } else
-        shift_r = w_R_cur * vio_R_cur.transpose(); // w_R_vio
+        shift_r = w_R_cur * vio_R_cur.transpose(); // w_R_vio, 6 DOF
       shift_t =
           w_P_cur - w_R_cur * vio_R_cur.transpose() * vio_P_cur; // w_P_vio = w_P_cur - vio_P_cur
-      // shift vio pose of whole sequence to the world frame
+      // shift vio pose of whole sequence to the world frame for different sequences
       if (old_kf->sequence != cur_kf->sequence && sequence_loop[cur_kf->sequence] == 0) {
         w_r_vio = shift_r;
         w_t_vio = shift_t;
@@ -290,6 +293,7 @@ KeyFrame *PoseGraph::getKeyFrame(int index) {
     return NULL;
 }
 
+// Loop closure detection, return min index
 int PoseGraph::detectLoop(KeyFrame *keyframe, int frame_index) {
   // put image into image_pool; for visualization
   cv::Mat compressed_image;
@@ -384,6 +388,8 @@ void PoseGraph::optimize4DoF() {
   while (true) {
     int cur_index = -1;
     int first_looped_index = -1;
+
+    // Find nearest frames that has loop detection and  earliest looped frame index
     m_optimize_buf.lock();
     while (!optimize_buf.empty()) {
       cur_index = optimize_buf.front();
@@ -391,6 +397,7 @@ void PoseGraph::optimize4DoF() {
       optimize_buf.pop();
     }
     m_optimize_buf.unlock();
+
     if (cur_index != -1) {
       printf("optimize pose graph \n");
       TicToc tmp_t;
@@ -422,8 +429,10 @@ void PoseGraph::optimize4DoF() {
 
       int i = 0;
       for (it = keyframelist.begin(); it != keyframelist.end(); it++) {
+        // iterate between the earliest looped frame and the nearest frame with loop detection
         if ((*it)->index < first_looped_index)
           continue;
+
         (*it)->local_index = i;
         Quaterniond tmp_q;
         Matrix3d tmp_r;
@@ -468,7 +477,6 @@ void PoseGraph::optimize4DoF() {
         }
 
         // add loop edge
-
         if ((*it)->has_loop) {
           assert((*it)->loop_index >= first_looped_index);
           int connected_index = getKeyFrame((*it)->loop_index)->local_index;
@@ -504,6 +512,7 @@ void PoseGraph::optimize4DoF() {
       for (it = keyframelist.begin(); it != keyframelist.end(); it++) {
         if ((*it)->index < first_looped_index)
           continue;
+          
         Quaterniond tmp_q;
         tmp_q = Utility::ypr2R(Vector3d(euler_array[i][0], euler_array[i][1], euler_array[i][2]));
         Vector3d tmp_t = Vector3d(t_array[i][0], t_array[i][1], t_array[i][2]);
