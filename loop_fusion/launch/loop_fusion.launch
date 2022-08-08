@@ -1,0 +1,10 @@
+<launch>
+  <!-- Start VINS -->
+  <node pkg="vins" type="vins_node" name="vins_estimator" output="log" args="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/rs_N3/realsense_stereo_imu_config.yaml"/>
+
+  <!-- Start loop fusion -->
+  <node pkg="loop_fusion" type="loop_fusion_node" name="loop_fusion_node" output="screen" args="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/rs_N3/realsense_stereo_imu_config.yaml"/>
+
+  <node pkg="rosbag" type="play" name="player" output="log" args="--clock --delay 1 -s 15.0 /home/eason/source/bag/reconstruction_2021-08-28-22-43-32.bag"/>
+
+</launch>

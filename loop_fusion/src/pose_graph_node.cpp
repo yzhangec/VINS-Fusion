@@ -32,10 +32,28 @@
 #include <thread>
 #include <vector>
 #include <visualization_msgs/Marker.h>
+
+#include <message_filters/subscriber.h>
+#include <message_filters/sync_policies/approximate_time.h>
+#include <message_filters/sync_policies/exact_time.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/time_synchronizer.h>
+
+#include "CNN/mobilenetvlad_onnx.h"
+#include "CNN/onnx_generic.h"
+#include "CNN/superpoint_onnx.h"
+#include "backward/backward.hpp"
+#include "loop_fusion/StereoImage.h"
+
+namespace backward {
+backward::SignalHandling sh;
+}
+
 #define SKIP_FIRST_CNT 10
 using namespace std;
+using namespace loop_closure;
 
-queue<sensor_msgs::ImageConstPtr> image_buf;
+queue<loop_fusion::StereoImagePtr> image_buf;
 queue<sensor_msgs::PointCloudConstPtr> point_buf;
 queue<nav_msgs::Odometry::ConstPtr> pose_buf;
 queue<Eigen::Vector3d> odometry_buf;
@@ -63,6 +81,7 @@ Eigen::Matrix3d qic;
 ros::Publisher pub_match_img;
 ros::Publisher pub_camera_pose_visual;
 ros::Publisher pub_odometry_rect;
+ros::Publisher debug_marker_array_pub_;
 
 std::string BRIEF_PATTERN_FILE;
 std::string POSE_GRAPH_SAVE_PATH;
@@ -72,6 +91,115 @@ Eigen::Vector3d last_t(-100, -100, -100);
 double last_image_time = -1;
 
 ros::Publisher pub_point_cloud, pub_margin_cloud;
+
+MobileNetVLADONNX *netvlad_onnx = nullptr;
+SuperPointONNX *superpoint_onnx = nullptr;
+Eigen::Matrix4d T_cam_l_r, T_i_c;
+std::vector<camodocal::CameraPtr> stereo_camera_;
+
+typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::Image>
+    ImageSyncPolicy;
+
+void drawFeatureOnImage(cv::Mat &image, const std::vector<cv::Point2f> &pts,
+                        const cv::Scalar &color) {
+  for (const cv::Point2f &pt : pts) {
+    cv::circle(image, pt, 3, color, 1);
+  }
+}
+
+bool inBorder(const cv::Point2f &pt, const int &row, const int &col) {
+  const int BORDER_SIZE = 1;
+  int img_x = cvRound(pt.x);
+  int img_y = cvRound(pt.y);
+  return BORDER_SIZE <= img_x && img_x < col - BORDER_SIZE && BORDER_SIZE <= img_y &&
+         img_y < row - BORDER_SIZE;
+}
+
+double distance(cv::Point2f pt1, cv::Point2f pt2) {
+  double dx = pt1.x - pt2.x;
+  double dy = pt1.y - pt2.y;
+  return sqrt(dx * dx + dy * dy);
+}
+
+template <typename Derived> void reduceVector(std::vector<Derived> &v, std::vector<uchar> status) {
+  int j = 0;
+  for (int i = 0; i < int(v.size()); i++)
+    if (status[i])
+      v[j++] = v[i];
+  v.resize(j);
+}
+
+template <typename Derived>
+void reduceDescriptorVector(std::vector<Derived> &v, std::vector<uchar> status) {
+  // v.size FEATURE_DESC_SIZE * status.size()
+  int j = 0;
+  int FEATURE_DESC_SIZE = 256;
+  for (int i = 0; i < int(status.size()); i++)
+    if (status[i]) {
+      for (int k = 0; k < FEATURE_DESC_SIZE; k++) {
+        v[j * FEATURE_DESC_SIZE + k] = v[i * FEATURE_DESC_SIZE + k];
+      }
+      j++;
+    }
+  v.resize(j * FEATURE_DESC_SIZE);
+}
+
+void triangulatePoint(const Eigen::Matrix<double, 3, 4> &Pose0,
+                      const Eigen::Matrix<double, 3, 4> &Pose1, const Eigen::Vector2d &point0,
+                      const Eigen::Vector2d &point1, Eigen::Vector3d &point_3d) {
+  Eigen::Matrix4d design_matrix = Eigen::Matrix4d::Zero();
+  Eigen::Vector4d triangulated_point;
+
+  design_matrix.row(0) = point0[0] * Pose0.row(2) - Pose0.row(0);
+  design_matrix.row(1) = point0[1] * Pose0.row(2) - Pose0.row(1);
+  design_matrix.row(2) = point1[0] * Pose1.row(2) - Pose1.row(0);
+  design_matrix.row(3) = point1[1] * Pose1.row(2) - Pose1.row(1);
+
+  triangulated_point = design_matrix.jacobiSvd(Eigen::ComputeFullV).matrixV().rightCols<1>();
+
+  point_3d(0) = triangulated_point(0) / triangulated_point(3);
+  point_3d(1) = triangulated_point(1) / triangulated_point(3);
+  point_3d(2) = triangulated_point(2) / triangulated_point(3);
+}
+
+void generate3dPoints(const std::vector<cv::Point2f> &left_pts,
+                      const std::vector<cv::Point2f> &right_pts,
+                      std::vector<cv::Point3f> &cur_pts_3d, std::vector<uchar> &status) {
+
+  Eigen::Matrix<double, 3, 4> P1, P2;
+
+  P1 << 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0;
+  P2.block(0, 0, 3, 3) = T_cam_l_r.block(0, 0, 3, 3).transpose();
+  P2.block(0, 3, 3, 1) = -P2.block(0, 0, 3, 3) * T_cam_l_r.block(0, 3, 3, 1);
+
+  status.clear();
+
+  for (unsigned int i = 0; i < left_pts.size(); ++i) {
+    Vector2d pl(left_pts[i].x, left_pts[i].y);
+    Vector2d pr(right_pts[i].x, right_pts[i].y);
+    Vector3d pt3;
+    triangulatePoint(P1, P2, pl, pr, pt3);
+
+    if (pt3[2] > 0 && pt3[2] < 5) {
+      cur_pts_3d.push_back(cv::Point3f(pt3[0], pt3[1], pt3[2]));
+      status.push_back(1);
+    } else {
+      status.push_back(0);
+    }
+  }
+}
+
+void undistortedPts(const std::vector<cv::Point2f> &pts, std::vector<cv::Point2f> &un_pts,
+                    const camodocal::CameraPtr &cam) {
+  un_pts.clear();
+  for (unsigned int i = 0; i < pts.size(); i++) {
+    Eigen::Vector2d a(pts[i].x, pts[i].y);
+    Eigen::Vector3d b;
+    // 将像素坐标转化为无畸变的归一化坐标
+    cam->liftProjective(a, b);
+    un_pts.push_back(cv::Point2f(b.x() / b.z(), b.y() / b.z()));
+  }
+}
 
 void new_sequence() {
   printf("new sequence\n");
@@ -95,22 +223,57 @@ void new_sequence() {
   m_buf.unlock();
 }
 
-void image_callback(const sensor_msgs::ImageConstPtr &image_msg) {
+void publishLandmarks(const std::vector<cv::Point3f> &landmarks) {
+  visualization_msgs::MarkerArray mk_array;
+  visualization_msgs::Marker mk;
+  mk.header.frame_id = "world";
+  mk.header.stamp = ros::Time::now();
+  mk.id = 0;
+  mk.ns = "Loop landmarks";
+  mk.type = visualization_msgs::Marker::POINTS;
+  mk.color.r = 1.0;
+  mk.color.g = 1.0;
+  mk.color.b = 1.0;
+  mk.color.a = 1.0;
+  mk.scale.x = 0.05;
+  mk.scale.y = 0.05;
+  mk.scale.z = 0.05;
+
+  for (const cv::Point3f &point : landmarks) {
+    geometry_msgs::Point pt;
+    pt.x = point.x;
+    pt.y = point.y;
+    pt.z = point.z;
+    mk.points.push_back(pt);
+  }
+  mk_array.markers.push_back(mk);
+
+  debug_marker_array_pub_.publish(mk_array);
+}
+
+void image_callback(const sensor_msgs::ImageConstPtr &image0_msg,
+                    const sensor_msgs::ImageConstPtr &image1_msg) {
   // ROS_INFO("image_callback!");
+
+  loop_fusion::StereoImagePtr stereo_image_msg(new loop_fusion::StereoImage);
+  stereo_image_msg->header = image0_msg->header;
+  stereo_image_msg->image0 = *image0_msg;
+  stereo_image_msg->image1 = *image1_msg;
+
   m_buf.lock();
-  image_buf.push(image_msg);
+  image_buf.push(stereo_image_msg);
   m_buf.unlock();
   // printf(" image time %f \n", image_msg->header.stamp.toSec());
 
   // detect unstable camera stream
-  if (last_image_time == -1)
-    last_image_time = image_msg->header.stamp.toSec();
-  else if (image_msg->header.stamp.toSec() - last_image_time > 1.0 ||
-           image_msg->header.stamp.toSec() < last_image_time) {
-    ROS_WARN("image discontinue! detect a new sequence!");
-    // new_sequence();
-  }
-  last_image_time = image_msg->header.stamp.toSec();
+  // if (last_image_time == -1)
+  //   last_image_time = image_msg->header.stamp.toSec();
+  // else if (image_msg->header.stamp.toSec() - last_image_time > 1.0 ||
+  //          image_msg->header.stamp.toSec() < last_image_time) {
+  //   ROS_WARN("image discontinue! detect a new sequence!");
+  //   // new_sequence();
+  // }
+  // last_image_time = image_msg->header.stamp.toSec();
 }
 
 void point_callback(const sensor_msgs::PointCloudConstPtr &point_msg) {
@@ -234,23 +397,47 @@ void extrinsic_callback(const nav_msgs::Odometry::ConstPtr &pose_msg) {
 
 void process() {
   while (true) {
-    sensor_msgs::ImageConstPtr image_msg = NULL;
-    sensor_msgs::PointCloudConstPtr point_msg = NULL;
+    loop_fusion::StereoImageConstPtr image_msg = NULL;
     nav_msgs::Odometry::ConstPtr pose_msg = NULL;
 
     // find out the messages with same time stamp
     // pose_msg, point_msg, image_msg
+    // m_buf.lock();
+    // if (!image_buf.empty() && !point_buf.empty() && !pose_buf.empty()) {
+    //   if (image_buf.front()->header.stamp.toSec() > pose_buf.front()->header.stamp.toSec()) {
+    //     pose_buf.pop();
+    //     printf("throw pose at beginning\n");
+    //   } else if (image_buf.front()->header.stamp.toSec() >
+    //              point_buf.front()->header.stamp.toSec()) {
+    //     point_buf.pop();
+    //     printf("throw point at beginning\n");
+    //   } else if (image_buf.back()->header.stamp.toSec() >= pose_buf.front()->header.stamp.toSec()
+    //   &&
+    //              point_buf.back()->header.stamp.toSec() >=
+    //              pose_buf.front()->header.stamp.toSec()) {
+    //     pose_msg = pose_buf.front();
+    //     pose_buf.pop();
+    //     while (!pose_buf.empty())
+    //       pose_buf.pop();
+    //     while (image_buf.front()->header.stamp.toSec() < pose_msg->header.stamp.toSec())
+    //       image_buf.pop();
+    //     image_msg = image_buf.front();
+    //     image_buf.pop();
+
+    //     while (point_buf.front()->header.stamp.toSec() < pose_msg->header.stamp.toSec())
+    //       point_buf.pop();
+    //     point_msg = point_buf.front();
+    //     point_buf.pop();
+    //   }
+    // }
+    // m_buf.unlock();
+
     m_buf.lock();
-    if (!image_buf.empty() && !point_buf.empty() && !pose_buf.empty()) {
+    if (!image_buf.empty() && !pose_buf.empty()) {
       if (image_buf.front()->header.stamp.toSec() > pose_buf.front()->header.stamp.toSec()) {
         pose_buf.pop();
         printf("throw pose at beginning\n");
-      } else if (image_buf.front()->header.stamp.toSec() >
-                 point_buf.front()->header.stamp.toSec()) {
-        point_buf.pop();
-        printf("throw point at beginning\n");
-      } else if (image_buf.back()->header.stamp.toSec() >= pose_buf.front()->header.stamp.toSec() &&
-                 point_buf.back()->header.stamp.toSec() >= pose_buf.front()->header.stamp.toSec()) {
+      } else if (image_buf.back()->header.stamp.toSec() >= pose_buf.front()->header.stamp.toSec()) {
         pose_msg = pose_buf.front();
         pose_buf.pop();
         while (!pose_buf.empty())
@@ -259,11 +446,6 @@ void process() {
           image_buf.pop();
         image_msg = image_buf.front();
         image_buf.pop();
-
-        while (point_buf.front()->header.stamp.toSec() < pose_msg->header.stamp.toSec())
-          point_buf.pop();
-        point_msg = point_buf.front();
-        point_buf.pop();
       }
     }
     m_buf.unlock();
@@ -285,21 +467,38 @@ void process() {
         skip_cnt = 0;
       }
 
-      cv_bridge::CvImageConstPtr ptr;
-      if (image_msg->encoding == "8UC1") {
-        sensor_msgs::Image img;
-        img.header = image_msg->header;
-        img.height = image_msg->height;
-        img.width = image_msg->width;
-        img.is_bigendian = image_msg->is_bigendian;
-        img.step = image_msg->step;
-        img.data = image_msg->data;
-        img.encoding = "mono8";
-        ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8);
-      } else
-        ptr = cv_bridge::toCvCopy(image_msg, sensor_msgs::image_encodings::MONO8);
+      cv_bridge::CvImageConstPtr ptr0, ptr1;
+      sensor_msgs::Image image0_msg, image1_msg;
+      image0_msg = image_msg->image0;
+      image1_msg = image_msg->image1;
+      if (image0_msg.encoding == "8UC1") {
+        sensor_msgs::Image img0, img1;
+        img0.header = image0_msg.header;
+        img0.height = image0_msg.height;
+        img0.width = image0_msg.width;
+        img0.is_bigendian = image0_msg.is_bigendian;
+        img0.step = image0_msg.step;
+        img0.data = image0_msg.data;
+        img0.encoding = "mono8";
 
-      cv::Mat image = ptr->image;
+        img1.header = image1_msg.header;
+        img1.height = image1_msg.height;
+        img1.width = image1_msg.width;
+        img1.is_bigendian = image1_msg.is_bigendian;
+        img1.step = image1_msg.step;
+        img1.data = image1_msg.data;
+        img1.encoding = "mono8";
+
+        ptr0 = cv_bridge::toCvCopy(img0, sensor_msgs::image_encodings::MONO8);
+        ptr1 = cv_bridge::toCvCopy(img1, sensor_msgs::image_encodings::MONO8);
+      } else {
+        ptr0 = cv_bridge::toCvCopy(image0_msg, sensor_msgs::image_encodings::MONO8);
+        ptr1 = cv_bridge::toCvCopy(image1_msg, sensor_msgs::image_encodings::MONO8);
+      }
+
+      cv::Mat image0 = ptr0->image;
+      cv::Mat image1 = ptr1->image;
+
       // build keyframe
       Vector3d T = Vector3d(pose_msg->pose.pose.position.x, pose_msg->pose.pose.position.y,
                             pose_msg->pose.pose.position.z);
@@ -312,30 +511,94 @@ void process() {
         vector<cv::Point2f> point_2d_normal;
         vector<double> point_id;
 
-        for (unsigned int i = 0; i < point_msg->points.size(); i++) {
-          cv::Point3f p_3d;
-          p_3d.x = point_msg->points[i].x;
-          p_3d.y = point_msg->points[i].y;
-          p_3d.z = point_msg->points[i].z;
-          point_3d.push_back(p_3d);
+        std::vector<float> global_desc;
+        std::vector<float> local_desc;
 
-          cv::Point2f p_2d_uv, p_2d_normal;
-          double p_id;
-          p_2d_normal.x = point_msg->channels[i].values[0];
-          p_2d_normal.y = point_msg->channels[i].values[1];
-          p_2d_uv.x = point_msg->channels[i].values[2];
-          p_2d_uv.y = point_msg->channels[i].values[3];
-          p_id = point_msg->channels[i].values[4];
-          point_2d_normal.push_back(p_2d_normal);
-          point_2d_uv.push_back(p_2d_uv);
-          point_id.push_back(p_id);
+        global_desc = netvlad_onnx->inference(image0(cv::Range(0, 480), cv::Range(124, 764)));
+        posegraph.faiss_index.add(1, global_desc.data());
 
-          // printf("u %f, v %f \n", p_2d_uv.x, p_2d_uv.y);
+        superpoint_onnx->inference(image0(cv::Range(0, 480), cv::Range(124, 764)), point_2d_uv,
+                                   local_desc);
+        for (int i = 0; i < point_2d_uv.size(); i++) {
+          point_2d_uv[i].x += 124;
+          point_2d_uv[i].y += 0;
         }
 
-        KeyFrame *keyframe =
-            new KeyFrame(pose_msg->header.stamp.toSec(), frame_index, T, R, image, point_3d,
-                         point_2d_uv, point_2d_normal, point_id, sequence);
+        std::vector<cv::Point2f> landmarks_2d_cam1, un_pts0, un_pts1;
+        std::vector<uchar> status;
+        std::vector<float> err;
+
+        cv::calcOpticalFlowPyrLK(image0, image1, point_2d_uv, landmarks_2d_cam1, status, err,
+                                 cv::Size(21, 21), 3);
+
+        std::vector<uchar> status_rl;
+        std::vector<cv::Point2f> reverseLeftPts;
+        cv::calcOpticalFlowPyrLK(image1, image0, landmarks_2d_cam1, reverseLeftPts, status_rl, err,
+                                 cv::Size(21, 21), 3);
+        for (size_t i = 0; i < status.size(); i++) {
+          if (status[i] && status_rl[i] && inBorder(landmarks_2d_cam1[i], 480, 640) &&
+              distance(point_2d_uv[i], reverseLeftPts[i]) <= 0.9)
+            status[i] = 1;
+          else
+            status[i] = 0;
+        }
+
+        reduceVector(point_2d_uv, status);
+        reduceVector(landmarks_2d_cam1, status);
+        reduceDescriptorVector(local_desc, status);
+        undistortedPts(point_2d_uv, point_2d_normal, stereo_camera_[0]);
+        undistortedPts(landmarks_2d_cam1, un_pts1, stereo_camera_[1]);
+        generate3dPoints(point_2d_normal, un_pts1, point_3d, status);
+        reduceVector(point_2d_uv, status);
+        reduceVector(point_2d_normal, status);
+        reduceVector(landmarks_2d_cam1, status);
+        reduceDescriptorVector(local_desc, status);
+
+        for (size_t i = 0; i < point_3d.size(); i++) {
+          Eigen::Vector3d pt_c, pt_i, pt_w;
+          pt_c << point_3d[i].x, point_3d[i].y, point_3d[i].z;
+          pt_i = T_i_c.block(0, 0, 3, 3) * pt_c + T_i_c.block(0, 3, 3, 1);
+          pt_w = R * pt_i + T;
+          point_3d[i].x = pt_w(0);
+          point_3d[i].y = pt_w(1);
+          point_3d[i].z = pt_w(2);
+        }
+
+        // for (unsigned int i = 0; i < point_msg->points.size(); i++) {
+        //   cv::Point3f p_3d;
+        //   p_3d.x = point_msg->points[i].x;
+        //   p_3d.y = point_msg->points[i].y;
+        //   p_3d.z = point_msg->points[i].z;
+        //   point_3d.push_back(p_3d);
+
+        //   cv::Point2f p_2d_uv, p_2d_normal;
+        //   double p_id;
+        //   p_2d_normal.x = point_msg->channels[i].values[0];
+        //   p_2d_normal.y = point_msg->channels[i].values[1];
+        //   p_2d_uv.x = point_msg->channels[i].values[2];
+        //   p_2d_uv.y = point_msg->channels[i].values[3];
+        //   p_id = point_msg->channels[i].values[4];
+        //   point_2d_normal.push_back(p_2d_normal);
+        //   point_2d_uv.push_back(p_2d_uv);
+        //   point_id.push_back(p_id);
+
+        //   // printf("u %f, v %f \n", p_2d_uv.x, p_2d_uv.y);
+        // }
+
+        cv::Mat show_img0, show_img1, show_img;
+        show_img0 = image0.clone();
+        show_img1 = image1.clone();
+        drawFeatureOnImage(show_img0, point_2d_uv, cv::Scalar(255, 255, 255));
+        drawFeatureOnImage(show_img1, landmarks_2d_cam1, cv::Scalar(255, 255, 255));
+        cv::hconcat(show_img0, show_img1, show_img);
+        cv::imshow("loop feature", show_img);
+        cv::waitKey(1);
+
+        publishLandmarks(point_3d);
+
+        Keyframe *keyframe =
+            new Keyframe(pose_msg->header.stamp.toSec(), frame_index, T, R, image0, point_3d,
+                         point_2d_uv, point_2d_normal, point_id, sequence, global_desc, local_desc);
         m_process.lock();
         start_flag = 1;
         posegraph.addKeyFrame(keyframe, 1);
@@ -398,7 +661,7 @@ int main(int argc, char **argv) {
   cameraposevisual.setScale(0.1);
   cameraposevisual.setLineWidth(0.01);
 
-  std::string IMAGE_TOPIC;
+  std::string IMAGE0_TOPIC, IMAGE1_TOPIC;
   int LOAD_PREVIOUS_POSE_GRAPH;
 
   ROW = fsSettings["image_height"];
@@ -419,7 +682,17 @@ int main(int argc, char **argv) {
   printf("cam calib path: %s\n", cam0Path.c_str());
   m_camera = camodocal::CameraFactory::instance()->generateCameraFromYamlFile(cam0Path.c_str());
 
-  fsSettings["image0_topic"] >> IMAGE_TOPIC;
+  std::string cam0_file, cam1_file;
+  camodocal::CameraPtr cam0, cam1;
+  cam0_file = "/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/rs_N3/left.yaml";
+  cam1_file = "/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/rs_N3/right.yaml";
+  cam0 = camodocal::CameraFactory::instance()->generateCameraFromYamlFile(cam0_file);
+  cam1 = camodocal::CameraFactory::instance()->generateCameraFromYamlFile(cam1_file);
+  stereo_camera_.push_back(cam0);
+  stereo_camera_.push_back(cam1);
+
+  fsSettings["image0_topic"] >> IMAGE0_TOPIC;
+  fsSettings["image1_topic"] >> IMAGE1_TOPIC;
   fsSettings["pose_graph_save_path"] >> POSE_GRAPH_SAVE_PATH;
   fsSettings["output_path"] >> VINS_RESULT_PATH;
   fsSettings["save_image"] >> DEBUG_IMAGE;
@@ -431,7 +704,6 @@ int main(int argc, char **argv) {
 
   int USE_IMU = fsSettings["imu"];
   posegraph.setIMUFlag(USE_IMU);
-  fsSettings.release();
 
   if (LOAD_PREVIOUS_POSE_GRAPH) {
     printf("load pose graph\n");
@@ -445,8 +717,26 @@ int main(int argc, char **argv) {
     load_flag = 1;
   }
 
+  netvlad_onnx = new MobileNetVLADONNX(
+      "/home/eason/workspace/exploration_ws/src/active_explore/exploration_planner/active_loop/"
+      "model/mobilenetvlad_480x640.onnx",
+      640, 480);
+  superpoint_onnx = new SuperPointONNX(
+      "/home/eason/workspace/exploration_ws/src/active_explore/exploration_planner/active_loop/"
+      "model/superpoint_v1_480x640.onnx",
+      std::string(), std::string(), 640, 480, 0.2, 200);
+
+  cv::Mat cv_Tbl, cv_Tbr;
+  Eigen::Matrix4d Tbl, Tbr;
+  fsSettings["body_T_cam0"] >> cv_Tbl;
+  fsSettings["body_T_cam1"] >> cv_Tbr;
+  cv::cv2eigen(cv_Tbl, Tbl);
+  cv::cv2eigen(cv_Tbr, Tbr);
+  T_cam_l_r = Tbl.inverse() * Tbr;
+  T_i_c = Tbl;
+  fsSettings.release();
+
   ros::Subscriber sub_vio = n.subscribe("/vins_estimator/odometry", 2000, vio_callback);
-  ros::Subscriber sub_image = n.subscribe(IMAGE_TOPIC, 2000, image_callback);
   ros::Subscriber sub_pose = n.subscribe("/vins_estimator/keyframe_pose", 2000, pose_callback);
   ros::Subscriber sub_extrinsic =
       n.subscribe("/vins_estimator/extrinsic", 2000, extrinsic_callback);
@@ -454,11 +744,22 @@ int main(int argc, char **argv) {
   ros::Subscriber sub_margin_point =
       n.subscribe("/vins_estimator/margin_cloud", 2000, margin_point_callback);
 
+  // ros::Subscriber sub_image = n.subscribe(IMAGE_TOPIC, 2000, image_callback);
+
+  message_filters::Subscriber<sensor_msgs::Image> image0_sub_;
+  message_filters::Subscriber<sensor_msgs::Image> image1_sub_;
+  message_filters::Synchronizer<ImageSyncPolicy> stereo_sync_(ImageSyncPolicy(100), image0_sub_,
+                                                              image1_sub_);
+  image0_sub_.subscribe(n, IMAGE0_TOPIC, 100);
+  image1_sub_.subscribe(n, IMAGE1_TOPIC, 100);
+  stereo_sync_.registerCallback(boost::bind(&image_callback, _1, _2));
+
   pub_match_img = n.advertise<sensor_msgs::Image>("match_image", 1000);
   pub_camera_pose_visual = n.advertise<visualization_msgs::MarkerArray>("camera_pose_visual", 1000);
   pub_point_cloud = n.advertise<sensor_msgs::PointCloud>("point_cloud_loop_rect", 1000);
   pub_margin_cloud = n.advertise<sensor_msgs::PointCloud>("margin_cloud_loop_rect", 1000);
   pub_odometry_rect = n.advertise<nav_msgs::Odometry>("odometry_rect", 1000);
+  debug_marker_array_pub_ = n.advertise<visualization_msgs::MarkerArray>("debug", 100);
 
   std::thread measurement_process;
   std::thread keyboard_command_process;
