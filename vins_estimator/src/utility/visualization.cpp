@@ -20,6 +20,7 @@ ros::Publisher pub_camera_pose_visual;
 nav_msgs::Path path;
 
 ros::Publisher pub_keyframe_pose;
+ros::Publisher pub_keyframe_camera_pose;
 ros::Publisher pub_keyframe_point;
 ros::Publisher pub_extrinsic;
 
@@ -43,6 +44,7 @@ void registerPub(ros::NodeHandle &n) {
   pub_camera_pose = n.advertise<geometry_msgs::PoseStamped>("camera_pose", 1000);
   pub_camera_pose_visual = n.advertise<visualization_msgs::MarkerArray>("camera_pose_visual", 1000);
   pub_keyframe_pose = n.advertise<nav_msgs::Odometry>("keyframe_pose", 1000);
+  pub_keyframe_camera_pose = n.advertise<nav_msgs::Odometry>("keyframe_camera_pose", 1000);
   pub_keyframe_point = n.advertise<sensor_msgs::PointCloud2>("keyframe_point", 1000);
   pub_extrinsic = n.advertise<nav_msgs::Odometry>("extrinsic", 1000);
   pub_image_track = n.advertise<sensor_msgs::Image>("image_track", 1000);
