@@ -380,6 +380,24 @@ void pubKeyframe(const Estimator &estimator) {
 
     pub_keyframe_pose.publish(odometry);
 
+    Vector3d P_cam = estimator.Ps[i] + estimator.Rs[i] * estimator.tic[0];
+    Quaterniond R_cam = Quaterniond(estimator.Rs[i] * estimator.ric[0]);
+
+    nav_msgs::Odometry odometry_cam;
+    odometry_cam.header.stamp = ros::Time(estimator.Headers[i]);
+    odometry_cam.header.frame_id = "world";
+    odometry_cam.pose.pose.position.x = P_cam.x();
+    odometry_cam.pose.pose.position.y = P_cam.y();
+    odometry_cam.pose.pose.position.z = P_cam.z();
+    odometry_cam.pose.pose.orientation.x = P_cam.x();
+    odometry_cam.pose.pose.orientation.y = P_cam.y();
+    odometry_cam.pose.pose.orientation.z = P_cam.z();
+    odometry_cam.pose.pose.orientation.w = P_cam.w();
+    // printf("time: %f t: %f %f %f r: %f %f %f %f\n", odometry.header.stamp.toSec(), P.x(), P.y(),
+    // P.z(), R.w(), R.x(), R.y(), R.z());
+
+    pub_keyframe_camera_pose.publish(odometry_cam);
+
     sensor_msgs::PointCloud point_cloud;
     point_cloud.header.stamp = ros::Time(estimator.Headers[WINDOW_SIZE - 2]);
     point_cloud.header.frame_id = "world";
