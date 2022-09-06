@@ -389,10 +389,10 @@ void pubKeyframe(const Estimator &estimator) {
     odometry_cam.pose.pose.position.x = P_cam.x();
     odometry_cam.pose.pose.position.y = P_cam.y();
     odometry_cam.pose.pose.position.z = P_cam.z();
-    odometry_cam.pose.pose.orientation.x = P_cam.x();
-    odometry_cam.pose.pose.orientation.y = P_cam.y();
-    odometry_cam.pose.pose.orientation.z = P_cam.z();
-    odometry_cam.pose.pose.orientation.w = P_cam.w();
+    odometry_cam.pose.pose.orientation.x = R_cam.x();
+    odometry_cam.pose.pose.orientation.y = R_cam.y();
+    odometry_cam.pose.pose.orientation.z = R_cam.z();
+    odometry_cam.pose.pose.orientation.w = R_cam.w();
     // printf("time: %f t: %f %f %f r: %f %f %f %f\n", odometry.header.stamp.toSec(), P.x(), P.y(),
     // P.z(), R.w(), R.x(), R.y(), R.z());
 
