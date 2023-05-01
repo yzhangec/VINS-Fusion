@@ -9,7 +9,7 @@
 
 #include "CameraPoseVisualization.h"
 
-#define IS_AIRSIM true
+#define IS_AIRSIM false
 
 const Eigen::Vector3d CameraPoseVisualization::imlt = Eigen::Vector3d(-1.0, -0.5, 1.0);
 const Eigen::Vector3d CameraPoseVisualization::imrt = Eigen::Vector3d(1.0, -0.5, 1.0);
