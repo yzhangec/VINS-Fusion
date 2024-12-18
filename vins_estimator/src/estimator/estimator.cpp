@@ -184,7 +184,7 @@ void Estimator::inputIMU(double t, const Vector3d &linearAcceleration,
     fastPredictIMU(t, linearAcceleration, angularVelocity);
     pubLatestOdometry(latest_P, latest_Q, latest_V, t);
     latest_camera_P = latest_P + latest_Q.toRotationMatrix() * tic[0];
-    latest_camera_Q = latest_Q.toRotationMatrix() * ric[0];
+    latest_camera_Q = latest_Q.normalized().toRotationMatrix() * ric[0];
     pubLatestCameraPose(latest_camera_P, latest_camera_Q, latest_V, t);
     mPropagate.unlock();
   }
