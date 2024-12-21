@@ -107,7 +107,7 @@ void sync_process() {
         estimator.inputImage(time, image);
     }
 
-    std::chrono::milliseconds dura(2);
+    std::chrono::milliseconds dura(2); // 2ms, 500Hz
     std::this_thread::sleep_for(dura);
   }
 }
