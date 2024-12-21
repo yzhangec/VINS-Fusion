@@ -247,7 +247,7 @@ int main(int argc, char **argv)
     ROS_DEBUG("EIGEN_DONT_PARALLELIZE");
 #endif
 
-    ROS_WARN("waiting for image and imu...");
+    // ROS_WARN("waiting for image and imu...");
 
     registerPub(n);
 
