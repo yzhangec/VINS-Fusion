@@ -227,6 +227,8 @@ int main(int argc, char **argv)
     ros::NodeHandle n("~");
     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
 
+    ros::Duration(1).sleep();
+
     if(argc != 2)
     {
         printf("please intput: rosrun vins vins_node [config file] \n"
