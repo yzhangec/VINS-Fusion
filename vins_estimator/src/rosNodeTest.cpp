@@ -83,12 +83,12 @@ void sync_process()
                 double time0 = img0_buf.front()->header.stamp.toSec();
                 double time1 = img1_buf.front()->header.stamp.toSec();
                 // 0.003s sync tolerance
-                if(time0 < time1 - 0.003)
+                if(time0 < time1 - 0.08)
                 {
                     img0_buf.pop();
                     printf("throw img0\n");
                 }
-                else if(time0 > time1 + 0.003)
+                else if(time0 > time1 + 0.08)
                 {
                     img1_buf.pop();
                     printf("throw img1\n");
@@ -227,6 +227,8 @@ int main(int argc, char **argv)
     ros::NodeHandle n("~");
     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
 
+    ros::Duration(1).sleep();
+
     if(argc != 2)
     {
         printf("please intput: rosrun vins vins_node [config file] \n"
@@ -245,7 +247,7 @@ int main(int argc, char **argv)
     ROS_DEBUG("EIGEN_DONT_PARALLELIZE");
 #endif
 
-    ROS_WARN("waiting for image and imu...");
+    // ROS_WARN("waiting for image and imu...");
 
     registerPub(n);
 

@@ -150,26 +150,31 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1) 
     featureFrame = featureTracker.trackImage(t, _img, _img1);
   // printf("featureTracker time: %f\n", featureTrackerTime.toc());
 
-  if (SHOW_TRACK) {
-    cv::Mat imgTrack = featureTracker.getTrackImage();
-    pubTrackImage(imgTrack, t);
-  }
-
-  if (MULTIPLE_THREAD) {
-    // if(inputImageCnt % 2 == 0)
-    // {
-    mBuf.lock();
-    featureBuf.push(make_pair(t, featureFrame));
-    mBuf.unlock();
-    // }
-  } else {
-    mBuf.lock();
-    featureBuf.push(make_pair(t, featureFrame));
-    mBuf.unlock();
-    TicToc processTime;
-    processMeasurements();
-    printf("process time: %f\n", processTime.toc());
-  }
+    if (SHOW_TRACK)
+    {
+        cv::Mat imgTrack = featureTracker.getTrackImage();
+        pubTrackImage(imgTrack, t);
+    }
+    
+    if(MULTIPLE_THREAD)  
+    {     
+        if(inputImageCnt % 2 == 0)
+        {
+            mBuf.lock();
+            featureBuf.push(make_pair(t, featureFrame));
+            mBuf.unlock();
+        }
+    }
+    else
+    {
+        mBuf.lock();
+        featureBuf.push(make_pair(t, featureFrame));
+        mBuf.unlock();
+        TicToc processTime;
+        processMeasurements();
+        printf("process time: %f\n", processTime.toc());
+    }
+    
 }
 
 void Estimator::inputIMU(double t, const Vector3d &linearAcceleration,
@@ -180,15 +185,16 @@ void Estimator::inputIMU(double t, const Vector3d &linearAcceleration,
   // printf("input imu with time %f \n", t);
   mBuf.unlock();
 
-  if (solver_flag == NON_LINEAR) {
-    mPropagate.lock();
-    fastPredictIMU(t, linearAcceleration, angularVelocity);
-    pubLatestOdometry(latest_P, latest_Q, latest_V, t);
-    latest_camera_P = latest_P + latest_Q.toRotationMatrix() * tic[0];
-    latest_camera_Q = latest_Q.toRotationMatrix() * ric[0];
-    pubLatestCameraPose(latest_camera_P, latest_camera_Q, latest_V, t);
-    mPropagate.unlock();
-  }
+    if (solver_flag == NON_LINEAR)
+    {
+        mPropagate.lock();
+        fastPredictIMU(t, linearAcceleration, angularVelocity);
+        pubLatestOdometry(latest_P, latest_Q, latest_V, t);
+        latest_camera_P = latest_P + latest_Q.toRotationMatrix() * tic[0];
+        latest_camera_Q = latest_Q.toRotationMatrix() * ric[0];
+        pubLatestCameraPose(latest_camera_P, latest_camera_Q, latest_V, t);
+        mPropagate.unlock();
+    }
 }
 
 void Estimator::inputFeature(

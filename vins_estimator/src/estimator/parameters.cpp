@@ -128,8 +128,8 @@ void readParameters(std::string config_file)
             ROS_WARN(" Optimize extrinsic param around initial guess!");
             EX_CALIB_RESULT_PATH = OUTPUT_FOLDER + "/extrinsic_parameter.csv";
         }
-        if (ESTIMATE_EXTRINSIC == 0)
-            ROS_WARN(" fix extrinsic param ");
+        // if (ESTIMATE_EXTRINSIC == 0)
+        //     ROS_WARN(" fix extrinsic param ");
 
         cv::Mat cv_T;
         fsSettings["body_T_cam0"] >> cv_T;
