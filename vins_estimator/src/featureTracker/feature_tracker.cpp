@@ -163,17 +163,17 @@ FeatureTracker::trackImage(double _cur_time, const cv::Mat &_img, const cv::Mat 
     ROS_DEBUG("set mask costs %fms", t_m.toc());
 
     ROS_DEBUG("detect feature begins");
-    TicToc t_t;
     int n_max_cnt = MAX_CNT - static_cast<int>(cur_pts.size());
     if (n_max_cnt > 0) {
       if (mask.empty())
         cout << "mask is empty " << endl;
       if (mask.type() != CV_8UC1)
         cout << "mask type wrong " << endl;
+      TicToc t_t;
       cv::goodFeaturesToTrack(cur_img, n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);
+      // ROS_WARN("detect feature costs: %f ms", t_t.toc());
     } else
       n_pts.clear();
-    ROS_DEBUG("detect feature costs: %f ms", t_t.toc());
 
     for (auto &p : n_pts) {
       cur_pts.push_back(p);
