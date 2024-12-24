@@ -25,6 +25,7 @@
 #include "camodocal/camera_models/PinholeCamera.h"
 #include "../estimator/parameters.h"
 #include "../utility/tic_toc.h"
+#include "CNN/superpoint_onnx.h"
 
 using namespace std;
 using namespace camodocal;
@@ -82,4 +83,6 @@ public:
     bool stereo_cam;
     int n_id;
     bool hasPrediction;
+
+    loop_closure::SuperPointONNX *superpoint_onnx;
 };

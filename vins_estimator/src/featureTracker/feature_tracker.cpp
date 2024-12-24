@@ -46,6 +46,11 @@ FeatureTracker::FeatureTracker() {
   stereo_cam = 0;
   n_id = 0;
   hasPrediction = false;
+
+  const string model_path = "/home/eason/source/cnn_models/";
+  const string superpoint_model_path = model_path + "superpoint_v1_480x640.onnx";
+  superpoint_onnx =
+      new loop_closure::SuperPointONNX(superpoint_model_path, std::string(), std::string(), 640, 480, 0.2, 200);
 }
 
 void FeatureTracker::setMask() {
@@ -170,7 +175,10 @@ FeatureTracker::trackImage(double _cur_time, const cv::Mat &_img, const cv::Mat 
       if (mask.type() != CV_8UC1)
         cout << "mask type wrong " << endl;
       TicToc t_t;
-      cv::goodFeaturesToTrack(cur_img, n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);
+      // cv::goodFeaturesToTrack(cur_img, n_pts, MAX_CNT - cur_pts.size(), 0.01, MIN_DIST, mask);
+      std::vector<float> landmark_descriptor;
+      superpoint_onnx->inference(cur_img, n_pts, landmark_descriptor);
+
       // ROS_WARN("detect feature costs: %f ms", t_t.toc());
     } else
       n_pts.clear();
