@@ -1341,9 +1341,9 @@ void Estimator::predictPtsInNextFrame() {
 double Estimator::reprojectionError(Matrix3d &Ri, Vector3d &Pi, Matrix3d &rici, Vector3d &tici,
                                     Matrix3d &Rj, Vector3d &Pj, Matrix3d &ricj, Vector3d &ticj,
                                     double depth, Vector3d &uvi, Vector3d &uvj) {
-  Vector3d pts_w = Ri * (rici * (depth * uvi) + tici) + Pi;
-  Vector3d pts_cj = ricj.transpose() * (Rj.transpose() * (pts_w - Pj) - ticj);
-  Vector2d residual = (pts_cj / pts_cj.z()).head<2>() - uvj.head<2>();
+  Vector3d pts_w = Ri * (rici * (depth * uvi) + tici) + Pi;                    // calculate the world coordinate of the feature point in the camera frame i
+  Vector3d pts_cj = ricj.transpose() * (Rj.transpose() * (pts_w - Pj) - ticj); // reproject the world coordinate of the feature point to the camera frame j
+  Vector2d residual = (pts_cj / pts_cj.z()).head<2>() - uvj.head<2>();         // calculate the reprojection error
   double rx = residual.x();
   double ry = residual.y();
   return sqrt(rx * rx + ry * ry);
