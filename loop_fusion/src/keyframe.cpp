@@ -255,6 +255,8 @@ bool KeyFrame::findConnection(KeyFrame *old_kf) {
   matched_2d_cur_norm = point_2d_norm;
   matched_id = point_id;
 
+  printf("point_2d_uv size %d\n", point_2d_uv.size());
+
   TicToc t_match;
 #if 0
 		if (DEBUG_IMAGE)    
@@ -291,6 +293,9 @@ bool KeyFrame::findConnection(KeyFrame *old_kf) {
   reduceVector(matched_3d, status);
   reduceVector(matched_id, status);
   // printf("search by des finish\n");
+
+  printf("matched_2d_cur reduced size %d\n", matched_2d_cur.size());
+
 
 #if 0
   if (DEBUG_IMAGE) {
@@ -419,13 +424,12 @@ reduceVector(matched_id, status);
               cv::Point2f(20 + COL + gap, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
       cv::vconcat(notation, loop_match_img, loop_match_img);
 
-      /*
       ostringstream path;
-      path <<  "/home/tony-ws1/raw_data/loop_image/"
+      path <<  "/home/eason/output/loop_image/"
               << index << "-"
               << old_kf->index << "-" << "3pnp_match.jpg";
       cv::imwrite( path.str().c_str(), loop_match_img);
-      */
+
       if ((int)matched_2d_cur.size() > MIN_LOOP_NUM) {
         /*
         cv::imshow("loop connection",loop_match_img);
@@ -462,8 +466,7 @@ reduceVector(matched_id, status);
       return true;
     }
   }
-  // printf("loop final use num %d %lf--------------- \n", (int)matched_2d_cur.size(),
-  // t_match.toc());
+  printf("loop final use num %d %lf--------------- \n", (int)matched_2d_cur.size(), t_match.toc());
   return false;
 }
 

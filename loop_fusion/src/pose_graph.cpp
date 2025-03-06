@@ -87,10 +87,11 @@ void PoseGraph::addKeyFrame(KeyFrame *cur_kf, bool flag_detect_loop) {
     addKeyFrameIntoVoc(cur_kf);
   }
   if (loop_index != -1) {
-    printf(" %d detect loop with %d \n", cur_kf->index, loop_index);
+    printf("addKeyFrame: %d detect loop with %d \n", cur_kf->index, loop_index);
     KeyFrame *old_kf = getKeyFrame(loop_index);
 
     if (cur_kf->findConnection(old_kf)) {
+      printf("addKeyFrame: %d already connected with %d \n", cur_kf->index, loop_index);
       if (earliest_loop_index > loop_index || earliest_loop_index == -1)
         earliest_loop_index = loop_index;
 
@@ -137,6 +138,7 @@ void PoseGraph::addKeyFrame(KeyFrame *cur_kf, bool flag_detect_loop) {
         sequence_loop[cur_kf->sequence] = 1;
       }
       m_optimize_buf.lock();
+      printf("add loop into optimization buf \n");
       optimize_buf.push(cur_kf->index);
       m_optimize_buf.unlock();
     }

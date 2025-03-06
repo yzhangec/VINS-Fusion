@@ -43,7 +43,7 @@ void registerPub(ros::NodeHandle &n) {
   pub_camera_pose = n.advertise<geometry_msgs::PoseStamped>("camera_pose", 1000);
   pub_camera_pose_visual = n.advertise<visualization_msgs::MarkerArray>("camera_pose_visual", 1000);
   pub_keyframe_pose = n.advertise<nav_msgs::Odometry>("keyframe_pose", 1000);
-  pub_keyframe_point = n.advertise<sensor_msgs::PointCloud2>("keyframe_point", 1000);
+  pub_keyframe_point = n.advertise<sensor_msgs::PointCloud>("keyframe_point", 1000);
   pub_extrinsic = n.advertise<nav_msgs::Odometry>("extrinsic", 1000);
   pub_image_track = n.advertise<sensor_msgs::Image>("image_track", 1000);
 
@@ -277,16 +277,29 @@ void pubPointCloud(const Estimator &estimator, const std_msgs::Header &header) {
   // pub margined potin
   pcl::PointCloud<pcl::PointXYZ> margin_cloud;
 
+  // std::cout << "publish margin cloud" << std::endl;
+  // std::cout << "estimator.f_manager.feature.size(): " << estimator.f_manager.feature.size()
+  //           << std::endl;
+
   for (auto &it_per_id : estimator.f_manager.feature) {
     int used_num;
     used_num = it_per_id.feature_per_frame.size();
-    if (!(used_num >= 2 && it_per_id.start_frame < WINDOW_SIZE - 2))
+    if (!(used_num >= 2 && it_per_id.start_frame < WINDOW_SIZE - 2)) {
+      // std::cout << "continue" << std::endl;
       continue;
+    }
     // if (it_per_id->start_frame > WINDOW_SIZE * 3.0 / 4.0 || it_per_id->solve_flag != 1)
     //        continue;
 
     if (it_per_id.start_frame == 0 && it_per_id.feature_per_frame.size() <= 2 &&
-        it_per_id.solve_flag == 1) {
+    it_per_id.solve_flag == 1) {
+    // if (1 && it_per_id.feature_per_frame.size() <= 2 && it_per_id.solve_flag == 1) {
+
+      // std::cout << "it_per_id.start_frame: " << it_per_id.start_frame << std::endl;
+      // std::cout << "it_per_id.feature_per_frame.size(): " << it_per_id.feature_per_frame.size()
+      //           << std::endl;
+      // std::cout << "it_per_id.solve_flag: " << it_per_id.solve_flag << std::endl;
+
       int imu_i = it_per_id.start_frame;
       Vector3d pts_i = it_per_id.feature_per_frame[0].point * it_per_id.estimated_depth;
       Vector3d w_pts_i =
