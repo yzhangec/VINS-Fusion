@@ -1,0 +1,5 @@
+<launch>
+  <node name="vins_estimator" pkg="vins" type="vins_cov_node" output="screen" args="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/uav_simulator/uav_simulator.yaml" />
+
+  <node pkg="rosbag" type="play" name="player" output="log" args="--clock --delay 1 /home/eason/bag/vins_cov_simulator_2025-03-06-20-26-34.bag"/>
+</launch>
