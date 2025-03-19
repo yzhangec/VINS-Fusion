@@ -1,14 +1,3 @@
-/*******************************************************
- * Copyright (C) 2019, Aerial Robotics Group, Hong Kong University of Science and Technology
- *
- * This file is part of VINS.
- *
- * Licensed under the GNU General Public License v3.0;
- * you may not use this file except in compliance with the License.
- *
- * Author: Qin Tong (qintonguav@gmail.com)
- *******************************************************/
-
 #include <fstream>
 #include <map>
 #include <mutex>
@@ -26,7 +15,9 @@
 #include <ros/ros.h>
 #include <std_msgs/Float32.h>
 #include <std_msgs/Float32MultiArray.h>
+#include <std_msgs/String.h>
 
+#include <gtsam/base/serialization.h>
 #include <gtsam/geometry/Pose2.h>
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/inference/Symbol.h>
@@ -37,11 +28,102 @@
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/slam/PriorFactor.h>
 
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/serialization/export.hpp> // BOOST_CLASS_EXPORT_GUID
+#include <boost/serialization/serialization.hpp>
+
 #include "estimator/estimator.h"
 #include "estimator/parameters.h"
+#include "exploration_utils/SerializedGraphMsg.h"
 #include "utility/visualization.h"
 
-Estimator estimator;
+using namespace std;
+
+// namespace boost {
+// namespace serialization {
+// template <class Archive, typename Derived>
+// void serialize(Archive &ar, Eigen::EigenBase<Derived> &g, const unsigned int version) {
+//   ar &boost::serialization::make_array(g.derived().data(), g.size());
+// }
+// } // namespace serialization
+// } // namespace boost
+
+// /* Create GUIDs for Noisemodels */
+// /* ************************************************************************* */
+// // BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::Constrained, "gtsam_noiseModel_Constrained");
+// BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::Diagonal, "gtsam_noiseModel_Diagonal");
+// BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::Gaussian, "gtsam_noiseModel_Gaussian");
+// BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::Unit, "gtsam_noiseModel_Unit");
+// BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::Isotropic, "gtsam_noiseModel_Isotropic");
+// // BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::Robust, "gtsam_noiseModel_Robust");
+
+// // BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::mEstimator::Base,
+// "gtsam_noiseModel_mEstimator_Base");
+// // BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::mEstimator::Null,
+// "gtsam_noiseModel_mEstimator_Null");
+// // BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::mEstimator::Fair,
+// "gtsam_noiseModel_mEstimator_Fair");
+// // BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::mEstimator::Huber,
+// // "gtsam_noiseModel_mEstimator_Huber");
+// // BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::mEstimator::Tukey,
+// // "gtsam_noiseModel_mEstimator_Tukey");
+
+// // BOOST_CLASS_EXPORT_GUID(gtsam::SharedNoiseModel, "gtsam_SharedNoiseModel");
+// // BOOST_CLASS_EXPORT_GUID(gtsam::SharedDiagonal, "gtsam_SharedDiagonal");
+
+// /* Create GUIDs for geometry */
+// /* ************************************************************************* */
+// // GTSAM_VALUE_EXPORT(gtsam::Point2);
+// // GTSAM_VALUE_EXPORT(gtsam::Point3);
+// // GTSAM_VALUE_EXPORT(gtsam::Rot2);
+// // GTSAM_VALUE_EXPORT(gtsam::Rot3);
+// // GTSAM_VALUE_EXPORT(gtsam::Pose2);
+// // GTSAM_VALUE_EXPORT(gtsam::Pose3);
+
+// BOOST_CLASS_EXPORT_GUID(gtsam::BetweenFactor<gtsam::Point3>,
+// "gtsam::BetweenFactor<gtsam::Point3>");
+// BOOST_CLASS_EXPORT_GUID(gtsam::BetweenFactor<gtsam::Rot3>, "gtsam::BetweenFactor<gtsam::Rot3>");
+// BOOST_CLASS_EXPORT_GUID(gtsam::BetweenFactor<gtsam::Pose3>,
+// "gtsam::BetweenFactor<gtsam::Pose3>"); BOOST_CLASS_EXPORT_GUID(gtsam::PriorFactor<gtsam::Point3>,
+// "gtsam::PriorFactor<gtsam::Point3>"); BOOST_CLASS_EXPORT_GUID(gtsam::PriorFactor<gtsam::Rot3>,
+// "gtsam::PriorFactor<gtsam::Rot3>"); BOOST_CLASS_EXPORT_GUID(gtsam::PriorFactor<gtsam::Pose3>,
+// "gtsam::PriorFactor<gtsam::Pose3>");
+
+// BOOST_CLASS_EXPORT_GUID(gtsam::Values, "gtsam_Values");
+// BOOST_CLASS_EXPORT_GUID(gtsam::NonlinearFactorGraph, "gtsam_NonlinearFactorGraph");
+
+BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::Constrained, "gtsam_noiseModel_Constrained");
+BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::Diagonal, "gtsam_noiseModel_Diagonal");
+BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::Gaussian, "gtsam_noiseModel_Gaussian");
+BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::Unit, "gtsam_noiseModel_Unit");
+BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::Isotropic, "gtsam_noiseModel_Isotropic");
+BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::Robust, "gtsam_noiseModel_Robust");
+BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::mEstimator::Base, "gtsam_noiseModel_mEstimator_Base");
+BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::mEstimator::Null, "gtsam_noiseModel_mEstimator_Null");
+BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::mEstimator::Fair, "gtsam_noiseModel_mEstimator_Fair");
+BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::mEstimator::Huber, "gtsam_noiseModel_mEstimator_Huber");
+BOOST_CLASS_EXPORT_GUID(gtsam::noiseModel::mEstimator::Tukey, "gtsam_noiseModel_mEstimator_Tukey");
+BOOST_CLASS_EXPORT_GUID(gtsam::SharedNoiseModel, "gtsam_SharedNoiseModel");
+BOOST_CLASS_EXPORT_GUID(gtsam::SharedDiagonal, "gtsam_SharedDiagonal");
+BOOST_CLASS_EXPORT_GUID(gtsam::JacobianFactor, "gtsam::JacobianFactor");
+BOOST_CLASS_EXPORT_GUID(gtsam::BetweenFactor<gtsam::Pose3>, "gtsam::BetweenFactor<gtsam::Pose3>");
+BOOST_CLASS_EXPORT_GUID(gtsam::BetweenFactor<gtsam::Point3>, "gtsam::BetweenFactor<gtsam::Point3>");
+BOOST_CLASS_EXPORT_GUID(gtsam::BetweenFactor<gtsam::Rot3>, "gtsam::BetweenFactor<gtsam::Rot3>");
+BOOST_CLASS_EXPORT_GUID(gtsam::PriorFactor<gtsam::Point3>, "gtsam::PriorFactor<gtsam::Point3>");
+BOOST_CLASS_EXPORT_GUID(gtsam::PriorFactor<gtsam::Rot3>, "gtsam::PriorFactor<gtsam::Rot3>");
+BOOST_CLASS_EXPORT_GUID(gtsam::PriorFactor<gtsam::Pose3>, "gtsam::PriorFactor<gtsam::Pose3>");
+BOOST_CLASS_EXPORT_GUID(gtsam::Values, "gtsam::Values");
+BOOST_CLASS_EXPORT_GUID(gtsam::NonlinearFactorGraph, "gtsam::NonlinearFactorGraph");
+BOOST_CLASS_EXPORT_GUID(gtsam::FactorGraph<gtsam::NonlinearFactor>,
+                        "gtsam::FactorGraph<gtsam::NonlinearFactor>");
+GTSAM_VALUE_EXPORT(gtsam::Point3);
+GTSAM_VALUE_EXPORT(gtsam::Rot3);
+GTSAM_VALUE_EXPORT(gtsam::Pose3);
+
+// Estimator estimator;
 
 std::string POSE_TOPIC = "/vins_estimator/odometry";
 
@@ -55,15 +137,23 @@ Eigen::Vector3d t_cam_l_r, t_imu_cam0, t_imu_cam1;
 
 std::vector<camodocal::CameraPtr> stereo_camera_;
 
-ros::Publisher pub_landmarks, pub_last_landmarks, pub_cov, pub_feature_img, pub_pose_array;
+ros::Publisher pub_landmarks, pub_last_landmarks, pub_cov, pub_feature_img, pub_pose_array,
+    pub_serialized_graph;
 
 gtsam::NonlinearFactorGraph graph;
 gtsam::Values initialEstimate;
+
+double graph_node_distance = 0.5;
+
+int num_poses = 0;
 
 // log file
 std::ofstream log_file;
 
 cv::Mat getImageFromMsg(const sensor_msgs::ImageConstPtr &img_msg) {
+  ROS_INFO_ONCE("Received image %d x %d, encoding: %s", img_msg->width, img_msg->height,
+                img_msg->encoding.c_str());
+
   cv_bridge::CvImageConstPtr ptr;
   if (img_msg->encoding == "8UC1") {
     sensor_msgs::Image img;
@@ -309,6 +399,11 @@ geometry_msgs::PoseArray pose_array;
 void syncCallback(const sensor_msgs::ImageConstPtr &img0_msg,
                   const sensor_msgs::ImageConstPtr &img1_msg,
                   const nav_msgs::OdometryConstPtr &pose_msg) {
+  ros::Time t_sync = ros::Time::now();
+
+  double t_optical_flow = 0.0;
+
+  ros::Time t_optical_flow_start, t_optical_flow_end;
   // print three timestamps
   // std::cout << std::setprecision(16);
   // std::cout << "receive img0 ts: " << img0_msg->header.stamp.toSec()
@@ -331,10 +426,13 @@ void syncCallback(const sensor_msgs::ImageConstPtr &img0_msg,
   vector<cv::Point2f> reverseLeftPts;
   vector<uchar> status, statusRightLeft;
   vector<float> err;
-  cv::calcOpticalFlowPyrLK(image0, image1, n_pts, n_pts_right, status, err, cv::Size(21, 21), 3);
+  t_optical_flow_start = ros::Time::now();
+  cv::calcOpticalFlowPyrLK(image0, image1, n_pts, n_pts_right, status, err, cv::Size(10, 10), 3);
 
   cv::calcOpticalFlowPyrLK(image1, image0, n_pts_right, reverseLeftPts, statusRightLeft, err,
-                           cv::Size(21, 21), 3);
+                           cv::Size(10, 10), 3);
+  t_optical_flow_end = ros::Time::now();
+  t_optical_flow += (t_optical_flow_end - t_optical_flow_start).toSec();
 
   for (size_t i = 0; i < status.size(); i++) {
     if (status[i] && statusRightLeft[i])
@@ -401,8 +499,11 @@ void syncCallback(const sensor_msgs::ImageConstPtr &img0_msg,
       vector<cv::Point2f> last_features_on_cur;
       status.clear();
       err.clear();
+
+      t_optical_flow_start = ros::Time::now();
+
       cv::calcOpticalFlowPyrLK(last_image0, image0, last_features, last_features_on_cur, status,
-                               err, cv::Size(21, 21), 3);
+                               err, cv::Size(10, 10), 3);
       // std::cout << "last_features_on_cur size: " << last_features_on_cur.size() <<
       // std::endl;
 
@@ -410,11 +511,13 @@ void syncCallback(const sensor_msgs::ImageConstPtr &img0_msg,
       vector<uchar> last_features_status, last_features_status_right;
       err.clear();
       cv::calcOpticalFlowPyrLK(image0, image1, last_features_on_cur, last_features_on_cur_right,
-                               last_features_status, err, cv::Size(21, 21), 3);
+                               last_features_status, err, cv::Size(10, 10), 3);
       reverseLeftPts.clear();
       err.clear();
       cv::calcOpticalFlowPyrLK(image1, image0, last_features_on_cur_right, reverseLeftPts,
-                               last_features_status_right, err, cv::Size(21, 21), 3);
+                               last_features_status_right, err, cv::Size(10, 10), 3);
+      t_optical_flow_end = ros::Time::now();
+      t_optical_flow += (t_optical_flow_end - t_optical_flow_start).toSec();
 
       for (size_t i = 0; i < last_features_status.size(); i++) {
         if (last_features_status[i] && last_features_status_right[i])
@@ -465,6 +568,8 @@ void syncCallback(const sensor_msgs::ImageConstPtr &img0_msg,
       }
     }
 
+    ros::Time t_pose_cov = ros::Time::now();
+
     Matrix<double, 6, 6> poseCovariance = Matrix<double, 6, 6>::Identity() * 1e-10;
     double poseCovDet = 1e-10;
     double poseCovTrace = poseCovariance.trace();
@@ -499,6 +604,9 @@ void syncCallback(const sensor_msgs::ImageConstPtr &img0_msg,
         if (poseCovariance(i, i) > 1) {
           poseCovariance(i, i) = 1;
         }
+        if (poseCovariance(i, i) < 1e-10) {
+          poseCovariance(i, i) = 1e-10;
+        }
       }
 
     } else {
@@ -515,20 +623,17 @@ void syncCallback(const sensor_msgs::ImageConstPtr &img0_msg,
       poseCovTrace = poseCovariance.trace();
     }
 
+    // cout << "Pose Covariance time: " << (ros::Time::now() - t_pose_cov).toSec() << endl;
+
     // Display result
     // cout << "Pose Covariance Matrix:\n" << poseCovariance << endl;
     // cout << "det(poseCovariance): " << poseCovDet << endl;
     // cout << "trace(poseCovariance): " << poseCovTrace << endl;
 
     // get last pose on graph
-    gtsam::Pose3 last_pose_on_graph = initialEstimate.at<gtsam::Pose3>(graph.size());
+    gtsam::Pose3 last_pose_on_graph = initialEstimate.at<gtsam::Pose3>(num_poses - 1);
 
-    Eigen::Matrix3d R_w_b_last =
-        Eigen::Quaterniond(last_pose_on_graph.rotation().toQuaternion().w(),
-                           last_pose_on_graph.rotation().toQuaternion().x(),
-                           last_pose_on_graph.rotation().toQuaternion().y(),
-                           last_pose_on_graph.rotation().toQuaternion().z())
-            .toRotationMatrix();
+    Eigen::Matrix3d R_w_b_last = last_pose_on_graph.rotation().matrix();
     Eigen::Vector3d t_w_b_last(last_pose_on_graph.translation().x(),
                                last_pose_on_graph.translation().y(),
                                last_pose_on_graph.translation().z());
@@ -544,7 +649,7 @@ void syncCallback(const sensor_msgs::ImageConstPtr &img0_msg,
     // std::cout << "R_last_cur: " << endl << R_last_cur << std::endl;
     // std::cout << "t_last_cur: " << endl << t_last_cur << std::endl;
 
-    if (t_last_cur.norm() > 1.0) {
+    if (t_last_cur.norm() > graph_node_distance) {
       std::cout << "add factor" << std::endl;
 
       gtsam::Pose3 odometry =
@@ -556,18 +661,22 @@ void syncCallback(const sensor_msgs::ImageConstPtr &img0_msg,
       // auto odometryNoise =
       //     gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector6::Constant(1e-4));
       // auto odometryNoise = gtsam::noiseModel::Gaussian::Covariance(poseCovariance);
+      std::cout << "poseCovariance: " << poseCovariance << std::endl;
       auto odometryNoise = gtsam::noiseModel::Gaussian::Covariance(onlyDiagnal(poseCovariance));
       // auto odometryNoise =
       //     gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector6::Constant(poseCovDet * 1e5));
-      int i = graph.size();
-      graph.add(gtsam::BetweenFactor<gtsam::Pose3>(i, i + 1, odometry, odometryNoise));
+      // int i = graph.size();
+      graph.add(
+          gtsam::BetweenFactor<gtsam::Pose3>(num_poses - 1, num_poses, odometry, odometryNoise));
 
       gtsam::Pose3 init_pose =
           gtsam::Pose3(gtsam::Rot3(pose.pose.pose.orientation.w, pose.pose.pose.orientation.x,
                                    pose.pose.pose.orientation.y, pose.pose.pose.orientation.z),
                        gtsam::Point3(pose.pose.pose.position.x, pose.pose.pose.position.y,
                                      pose.pose.pose.position.z));
-      initialEstimate.insert(graph.size(), init_pose);
+      initialEstimate.insert(num_poses, init_pose);
+      num_poses++;
+
       pose_array.header = pose.header;
       pose_array.poses.push_back(pose.pose.pose);
       pub_pose_array.publish(pose_array);
@@ -578,41 +687,185 @@ void syncCallback(const sensor_msgs::ImageConstPtr &img0_msg,
 
       // graph.print("Final factor graph:\n");
 
-      gtsam::Marginals marginals(graph, initialEstimate);
-      Matrix<double, 6, 6> nodeCovariance = marginals.marginalCovariance(graph.size());
-      double d_opt = nodeCovariance.determinant();
-      double t_opt = nodeCovariance.trace() - nodeCovariance(5, 5);
+      auto getDOptimal = [&](const Eigen::MatrixXd &mat) {
+        // // eigen values
+        // Eigen::EigenSolver<Eigen::MatrixXd> es(mat);
+        // Eigen::VectorXcd eigenvalues = es.eigenvalues();
 
-      // cout << "Node Covariance Matrix:\n" << nodeCovariance << endl;
-      cout << "graph size: " << graph.size() << ", D-opt: " << d_opt << ", T-opt: " << t_opt
-           << endl;
+        // // print eigenvalues
+        // std::cout << "Eigenvalues:\n" << eigenvalues.transpose() << std::endl;
+
+        // // d-optimal: exp(1/n * sum(log(eigenvalues)))
+        // double d_optimal = 0;
+        // for (int i = 0; i < eigenvalues.size(); ++i) {
+        //   d_optimal += log(eigenvalues(i).real());
+        // }
+        // d_optimal /= 6;
+        // d_optimal = exp(d_optimal);
+
+        // print mat.determinant()
+        // std::cout << "Determinant of the Matrix: " << mat.determinant() << std::endl;
+        // print pow(mat.determinant(), 1.0 / mat.rows())
+        // std::cout << "Pow of the Matrix: " << pow(mat.determinant(), 1.0 / mat.rows()) <<
+        // std::endl;
+
+        double d_optimal = pow(mat.determinant(), 1.0 / mat.rows());
+
+        // int n = mat.rows() + 1;
+        // double d_optimal = exp(log(mat.determinant()) / (double)n);
+        // d_optimal *= pow(n, 1.0 / n);
+
+        return d_optimal;
+      };
+
+      gtsam::Marginals marginals(graph, initialEstimate);
+      Matrix<double, 6, 6> nodeCovariance = marginals.marginalCovariance(num_poses - 1);
+      Matrix<double, 6, 6> nodeInformation = marginals.marginalInformation(num_poses - 1);
+      double d_opt = getDOptimal(nodeCovariance);
+      double d_opt_info = getDOptimal(nodeInformation);
+
+      cout << "Node Covariance Matrix:\n" << nodeCovariance << endl;
+      cout << "Node Information Matrix:\n" << nodeInformation << endl;
+
+      cout << "graph size: " << graph.size() << ", last pose D-opt: " << d_opt << endl;
+      cout << "graph size: " << graph.size() << ", last pose D-opt info: " << d_opt_info << endl;
+      cout << "num_poses: " << num_poses << endl;
+
+      // terminate program if d_opt is nan
+      if (std::isnan(d_opt)) {
+        ROS_ERROR("D-optimal is NaN!");
+        exit(EXIT_FAILURE);
+      }
+
+      // log_file << d_opt << " " << t_opt << " " << nodeCovariance(0, 0) << " "
+      //          << nodeCovariance(1, 1) << " " << nodeCovariance(2, 2) << " " << nodeCovariance(3,
+      //          3)
+      //          << " " << nodeCovariance(4, 4) << " " << nodeCovariance(5, 5) << std::endl;
+
+      // log_file << d_opt << " " << t_opt << " " << poseCovDet << " " << poseCovTrace << std::endl;
+
+      ros::Time t_cov = ros::Time::now();
+      Eigen::MatrixXd A = Eigen::MatrixXd::Zero(num_poses, num_poses);
+
+      for (const auto &factor : graph) {
+        if (auto betweenFactor =
+                dynamic_cast<const gtsam::BetweenFactor<gtsam::Pose3> *>(factor.get())) {
+          gtsam::Key key1 = betweenFactor->key1();
+          gtsam::Key key2 = betweenFactor->key2();
+          // std::cout << "Key1: " << key1 << ", Key2: " << key2 << std::endl;
+          A(key1, key2) = 1;
+          A(key2, key1) = 1;
+        }
+      }
+      // cout << "A:\n" << A << endl;
+
+      gtsam::Matrix D = gtsam::Matrix::Zero(A.rows(), A.cols());
+      for (int i = 0; i < A.rows(); ++i) {
+        D(i, i) = A.row(i).sum();
+      }
+
+      // cout << "D:\n" << D << endl;
+
+      gtsam::Matrix laplacian = D - A;
+
+      // Laplacian matrix of the pose graph is weighted by the D-optimal of the inverse of the
+      // covariance matrices for each edge in the pose graph.
+      gtsam::Matrix weighted_laplacian = laplacian;
+
+      // get edge weight
+      auto getEdgeWeight = [&](const gtsam::BetweenFactor<gtsam::Pose3> &factor) {
+        gtsam::Matrix edge_fim = factor.noiseModel()->sigmas().asDiagonal().inverse();
+        // lp-norm of fim
+        // double lp_norm = edge_fim.lpNorm<Eigen::Infinity>();
+        // cout << "Edge FIM:\n" << edge_fim << endl;
+        // cout << "Edge LP-Norm: " << lp_norm << endl;
+        // return lp_norm;
+
+        return getDOptimal(edge_fim);
+      };
+
+      // set diagonal to 0
+      for (int i = 0; i < weighted_laplacian.rows(); ++i) {
+        weighted_laplacian(i, i) = 0;
+      }
+
+      for (const auto &factor : graph) {
+        if (auto betweenFactor =
+                dynamic_cast<const gtsam::BetweenFactor<gtsam::Pose3> *>(factor.get())) {
+          gtsam::Key key1 = betweenFactor->key1();
+          // cout << "Key1: " << key1 << endl;
+          gtsam::Key key2 = betweenFactor->key2();
+          // cout << "Key2: " << key2 << endl;
+          double edge_weight = getEdgeWeight(*betweenFactor);
+          // cout << "Edge weight:\n" << edge_weight << endl;
+          // double d_optimal = edge_weight.determinant();
+          // cout << "D-Optimal: " << d_optimal << endl;
+
+          weighted_laplacian(key1, key2) *= edge_weight;
+          weighted_laplacian(key2, key1) *= edge_weight;
+
+          // diagnal
+          weighted_laplacian(key1, key1) += edge_weight;
+          weighted_laplacian(key2, key2) += edge_weight;
+        }
+      }
+
+      // remove the last row and column (remove an arbitrary node)
+      weighted_laplacian.conservativeResize(weighted_laplacian.rows() - 1,
+                                            weighted_laplacian.cols() - 1);
+
+      // std::cout << "Laplacian Matrix:\n" << laplacian << std::endl;
+      // std::cout << "Weighted Laplacian Matrix:\n" << weighted_laplacian << std::endl;
+
+      // determinant of the Laplacian matrix
+      // std::cout << "Determinant of the Laplacian Matrix: " << laplacian.determinant() <<
+      // std::endl;
+      double d_opt_weighted_laplacian = getDOptimal(weighted_laplacian);
+      std::cout << "D-opt of the Weighted Laplacian Matrix: " << d_opt_weighted_laplacian
+                << std::endl;
+      // trace
+      // std::cout << "Trace of the Weighted Laplacian Matrix: " << weighted_laplacian.trace()
+      //           << std::endl;
 
       std_msgs::Float32MultiArray cov_msg;
       cov_msg.data.push_back(d_opt);
-      cov_msg.data.push_back(poseCovDet);
+      cov_msg.data.push_back(d_opt_weighted_laplacian);
       pub_cov.publish(cov_msg);
 
-      log_file << d_opt << " " << t_opt << " " << nodeCovariance(0, 0) << " "
-               << nodeCovariance(1, 1) << " " << nodeCovariance(2, 2) << " " << nodeCovariance(3, 3)
-               << " " << nodeCovariance(4, 4) << " " << nodeCovariance(5, 5) << std::endl;
+      cout << "cov time: " << (ros::Time::now() - t_cov).toSec() << endl;
 
-      // log_file << d_opt << " " << t_opt << " " << poseCovDet << " " << poseCovTrace << std::endl;
+      exploration_utils::SerializedGraphMsg serialized_msg;
+      serialized_msg.header.stamp = ros::Time::now();
+      serialized_msg.serialized_graph = gtsam::serialize(graph);
+      serialized_msg.serialized_values = gtsam::serialize(initialEstimate);
+
+      pub_serialized_graph.publish(serialized_msg);
+
+      // deserialize
+      // gtsam::NonlinearFactorGraph graph_deserialized;
+      // gtsam::deserialize(serialized_graph, graph_deserialized);
+      // graph_deserialized.print("Deserialized Factor Graph:\n");
     }
   } else {
     if (graph.size() == 0) {
       gtsam::Pose3 priorMean = gtsam::Pose3(gtsam::Rot3::Identity(), gtsam::Point3(0, 0, 0));
       auto priorNoise = gtsam::noiseModel::Diagonal::Sigmas(gtsam::Vector6::Constant(1e-1));
-      graph.add(gtsam::PriorFactor<gtsam::Pose3>(1, priorMean, priorNoise));
+      graph.add(gtsam::PriorFactor<gtsam::Pose3>(0, priorMean, priorNoise));
       ROS_INFO("Added prior factor");
 
       gtsam::Pose3 init_pose =
           gtsam::Pose3(gtsam::Rot3(pose.pose.pose.orientation.w, pose.pose.pose.orientation.x,
                                    pose.pose.pose.orientation.y, pose.pose.pose.orientation.z),
-                       gtsam::Point3(pose.pose.pose.position.x, pose.pose.pose.position.y,
-                                     pose.pose.pose.position.z));
-      initialEstimate.insert(1, init_pose);
+                       gtsam::Point3(pose.pose.pose.position.x, pose.pose.pose.position.y, 1.0));
+      initialEstimate.insert(0, init_pose);
+
+      num_poses++;
+
       pose_array.header = pose.header;
-      pose_array.poses.push_back(pose.pose.pose);
+      geometry_msgs::Pose pose_msg;
+      pose_msg = pose.pose.pose;
+      pose_msg.position.z = 1.0;
+      pose_array.poses.push_back(pose_msg);
       pub_pose_array.publish(pose_array);
 
       // gtsam::LevenbergMarquardtOptimizer optimizer(graph, initialEstimate);
@@ -626,6 +879,9 @@ void syncCallback(const sensor_msgs::ImageConstPtr &img0_msg,
   last_features = n_pts;
   last_landmarks = landmarks;
   last_pose = pose;
+
+  // std::cout << "sync time: " << (ros::Time::now() - t_sync).toSec() << std::endl;
+  // std::cout << "optical flow time: " << t_optical_flow << std::endl;
 }
 
 int main(int argc, char **argv) {
@@ -646,7 +902,7 @@ int main(int argc, char **argv) {
   printf("config_file: %s\n", argv[1]);
 
   readParameters(config_file);
-  estimator.setParameter();
+  // estimator.setParameter();
 
   R_imu_cam0 = RIC[0];
   R_imu_cam1 = RIC[1];
@@ -673,13 +929,18 @@ int main(int argc, char **argv) {
 
   // ROS_WARN("waiting for image and imu...");
 
-  registerPub(n);
+  // registerPub(n);
+
+  // read ros param
+  n.param("graph_node_distance", graph_node_distance, 1.0);
 
   pub_landmarks = n.advertise<sensor_msgs::PointCloud2>("/vins_estimator/landmarks", 1);
   pub_last_landmarks = n.advertise<sensor_msgs::PointCloud2>("/vins_estimator/last_landmarks", 1);
   pub_cov = n.advertise<std_msgs::Float32MultiArray>("/vins_estimator/cov", 1);
   pub_feature_img = n.advertise<sensor_msgs::Image>("/vins_estimator/cov_feature_img", 1);
   pub_pose_array = n.advertise<geometry_msgs::PoseArray>("/vins_estimator/graph_pose_array", 1);
+  pub_serialized_graph =
+      n.advertise<exploration_utils::SerializedGraphMsg>("/vins_estimator/serialized_graph", 1);
 
   message_filters::Subscriber<sensor_msgs::Image> image0_sub(n, IMAGE0_TOPIC, 1);
   message_filters::Subscriber<sensor_msgs::Image> image1_sub(n, IMAGE1_TOPIC, 1);
@@ -692,13 +953,17 @@ int main(int argc, char **argv) {
                                                    odom_sub);
   sync.registerCallback(boost::bind(&syncCallback, _1, _2, _3));
 
-  log_file.open("/home/eason/workspace/exploration_ws/src/VINS-Fusion/log/covariance.log");
+  // log_file.open("/home/eason/workspace/exploration_ws/src/VINS-Fusion/log/covariance.log");
 
   ros::Rate rate(100);
   while (ros::ok()) {
     ros::spinOnce();
     rate.sleep();
   }
+
+  // log_file.close();
+
+  std::cout << "Covariance estimator finished!" << std::endl;
 
   return 0;
 }

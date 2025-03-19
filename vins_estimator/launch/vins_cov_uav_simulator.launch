@@ -1,5 +1,10 @@
 <launch>
-  <node name="vins_estimator" pkg="vins" type="vins_cov_node" output="screen" args="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/uav_simulator/uav_simulator.yaml" />
+  <arg name="enable_rosbag" default="false" />
 
-  <node pkg="rosbag" type="play" name="player" output="log" args="--clock --delay 1 /home/eason/bag/vins_cov_simulator_2025-03-06-20-26-34.bag"/>
+  <node name="vins_estimator_cov" pkg="vins" type="vins_cov_node" output="screen" args="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/uav_simulator/uav_simulator.yaml" >
+    <param name="graph_node_distance" value="1.0" type="double"/>
+  </node>
+  <group if="$(arg enable_rosbag)">
+    <node pkg="rosbag" type="play" name="player" output="log" args="--clock --delay 1 /home/eason/bag/vins_cov_simulator_2025-03-06-20-26-34.bag"/>
+  </group>
 </launch>
