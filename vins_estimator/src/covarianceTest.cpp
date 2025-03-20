@@ -810,9 +810,40 @@ void syncCallback(const sensor_msgs::ImageConstPtr &img0_msg,
         }
       }
 
+      // calculate eigenvalues of weighted_laplacian
+      Eigen::EigenSolver<Eigen::MatrixXd> es(weighted_laplacian);
+      Eigen::VectorXcd eigenvalues = es.eigenvalues();
+
+      // print eigenvalues
+      std::cout << "Eigenvalues:\n" << eigenvalues.transpose() << std::endl;
+
+      double product_eigenvalues_nonzero = 1;
+      for (int i = 0; i < eigenvalues.size(); ++i) {
+        if (eigenvalues(i).real() > 1e-10) {
+          product_eigenvalues_nonzero *= eigenvalues(i).real();
+        }
+      }
+
+      // print eigenvalues product
+      std::cout << "Eigenvalues product: " << product_eigenvalues_nonzero << std::endl;
+      std::cout << "Eigenvalues product / n: "
+                << product_eigenvalues_nonzero / weighted_laplacian.rows() << std::endl;
+
       // remove the last row and column (remove an arbitrary node)
       weighted_laplacian.conservativeResize(weighted_laplacian.rows() - 1,
                                             weighted_laplacian.cols() - 1);
+
+      // calculate eigenvalues of reduced weighted_laplacian
+      Eigen::EigenSolver<Eigen::MatrixXd> es_reduced(weighted_laplacian);
+      Eigen::VectorXcd eigenvalues_reduced = es_reduced.eigenvalues();
+
+      // print eigenvalues
+      std::cout << "Eigenvalues Reduced:\n" << eigenvalues_reduced.transpose() << std::endl;
+      std::cout << "Eigenvalues Reduced product: " << eigenvalues_reduced.prod() << std::endl;
+
+      // print the determinant of the reduced weighted_laplacian
+      std::cout << "Determinant of the Reduced Weighted Laplacian Matrix: "
+                << weighted_laplacian.determinant() << std::endl;
 
       // std::cout << "Laplacian Matrix:\n" << laplacian << std::endl;
       // std::cout << "Weighted Laplacian Matrix:\n" << weighted_laplacian << std::endl;
