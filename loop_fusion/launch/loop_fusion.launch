@@ -1,10 +1,21 @@
 <launch>
-  <!-- Start VINS -->
-  <node pkg="vins" type="vins_node" name="vins_estimator" output="log" args="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/rs_N3/realsense_stereo_imu_config.yaml"/>
+  <arg name="enable_vins" default="false" />
+  <arg name="enable_loop" default="true" />
+  <arg name="enable_bag" default="false" />
+  <!-- <arg name="config_file" default="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/realsense_d435i/realsense_stereo_imu_config.yaml" /> -->
+  <arg name="config_file" default="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/uav_simulator/uav_simulator.yaml" />
 
-  <!-- Start loop fusion -->
-  <node pkg="loop_fusion" type="loop_fusion_node" name="loop_fusion_node" output="screen" args="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/rs_N3/realsense_stereo_imu_config.yaml"/>
 
-  <node pkg="rosbag" type="play" name="player" output="log" args="--clock --delay 1 -s 15.0 /home/eason/source/bag/reconstruction_2021-08-28-22-43-32.bag"/>
+  <group if="$(arg enable_vins)">
+    <node pkg="vins" type="vins_node" name="vins_estimator" output="log" args="$(arg config_file)"/>
+  </group>
 
+  <group if="$(arg enable_loop)">
+    <node pkg="loop_fusion" type="loop_fusion_node" name="loop_fusion" output="screen" args="$(arg config_file)"/>
+  </group>
+
+  <group if="$(arg enable_bag)">
+    <arg name="bag_file" default="/home/eason/source/bag/reconstruction_2021-08-28-22-43-32.bag" />
+    <node pkg="rosbag" type="play" name="player" output="log" args="--clock --delay 1 -s 0 $(arg bag_file)"/>
+  </group>
 </launch>

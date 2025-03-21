@@ -49,15 +49,11 @@ public:
   ~PoseGraph();
   void registerPub(ros::NodeHandle &n);
   void addKeyFrame(Keyframe *cur_kf, bool flag_detect_loop);
-  void loadKeyFrame(Keyframe *cur_kf, bool flag_detect_loop);
-  void loadVocabulary(std::string voc_path);
   void setIMUFlag(bool _use_imu);
   Keyframe *getKeyFrame(int index);
   nav_msgs::Path path[10];
   nav_msgs::Path base_path;
   CameraPoseVisualization *posegraph_visualization;
-  void savePoseGraph();
-  void loadPoseGraph();
   void publish();
   Vector3d t_drift;
   double yaw_drift;
@@ -68,11 +64,9 @@ public:
   faiss::IndexFlatIP faiss_index;
 
 private:
-  int detectLoop(Keyframe *keyframe, int frame_index);
   int detectLoopML(Keyframe *keyframe, int frame_index);
   void addKeyFrameIntoVoc(Keyframe *keyframe);
   void optimize4DoF();
-  void optimize6DoF();
   void updatePath();
   list<Keyframe *> keyframelist;
   std::mutex m_keyframelist;
@@ -89,9 +83,6 @@ private:
   int earliest_loop_index;
   int base_sequence;
   bool use_imu;
-
-  BriefDatabase db;
-  BriefVocabulary *voc;
 
   ros::Publisher pub_pg_path;
   ros::Publisher pub_base_path;
