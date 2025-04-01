@@ -38,6 +38,7 @@ void PoseGraph::registerPub(ros::NodeHandle &n) {
   pub_opt = n.advertise<nav_msgs::Path>("path_optimization_trigger", 1000);
   for (int i = 1; i < 10; i++)
     pub_path[i] = n.advertise<nav_msgs::Path>("path_" + to_string(i), 1000);
+  pub_loop_pairs = n.advertise<std_msgs::Int32MultiArray>("loop_pairs", 1000);
 }
 
 void PoseGraph::setIMUFlag(bool _use_imu) {
@@ -45,10 +46,10 @@ void PoseGraph::setIMUFlag(bool _use_imu) {
   if (use_imu) {
     printf("VIO input, perfrom 4 DoF (x, y, z, yaw) pose graph optimization\n");
     t_optimization = std::thread(&PoseGraph::optimize4DoF, this);
-  } 
+  }
 }
 
-void PoseGraph::addKeyFrame(Keyframe *cur_kf, bool flag_detect_loop) {
+void PoseGraph::addKeyFrame(Keyframe *cur_kf, bool use_gt) {
   // shift to base frame
   Vector3d vio_P_cur;
   Matrix3d vio_R_cur;
@@ -70,20 +71,20 @@ void PoseGraph::addKeyFrame(Keyframe *cur_kf, bool flag_detect_loop) {
   cur_kf->index = global_index;
   global_index++;
   int loop_index = -1;
-  if (flag_detect_loop) {
-    // addKeyFrame 2nd param, looks like only true is set
-    TicToc tmp_t;
-    loop_index = detectLoopML(cur_kf, cur_kf->index);
-    // std::cout << "detect loop : " << loop_index << std::endl;
-  } else {
-    // used for loadKeyFrame
-    // addKeyFrameIntoVoc(cur_kf);
-  }
-  if (loop_index != -1 && loop_index < cur_kf->index) {
-    // printf(" %d detect loop with %d \n", cur_kf->index, loop_index);
-    Keyframe *old_kf = getKeyFrame(loop_index);
+  TicToc tmp_t;
+  loop_index = detectLoopML(cur_kf, cur_kf->index);
+  // std::cout << "detect loop : " << loop_index << std::endl;
 
-    if (cur_kf->findConnection(old_kf)) {
+  if (loop_index != -1 && loop_index < cur_kf->index) {
+    Keyframe *old_kf = getKeyFrame(loop_index);
+    if (cur_kf->findConnection(old_kf, use_gt)) {
+      printf(" %d detect loop with %d , old kf img_seq %d, new kf seq %d \n", cur_kf->index,
+             loop_index, old_kf->img_seq, cur_kf->img_seq);
+      printf("loop info %lf %lf %lf %lf %lf %lf %lf %lf \n", cur_kf->loop_info(0),
+             cur_kf->loop_info(1), cur_kf->loop_info(2), cur_kf->loop_info(3), cur_kf->loop_info(4),
+             cur_kf->loop_info(5), cur_kf->loop_info(6), cur_kf->loop_info(7));
+      loop_pairs.push_back(std::make_pair(cur_kf->img_seq, old_kf->img_seq));
+
       if (earliest_loop_index > loop_index || earliest_loop_index == -1)
         earliest_loop_index = loop_index;
 
@@ -131,9 +132,9 @@ void PoseGraph::addKeyFrame(Keyframe *cur_kf, bool flag_detect_loop) {
       }
 
       // print relative pose
-      printf("relative_t %lf %lf %lf \n", relative_t.x(), relative_t.y(), relative_t.z());
-      printf("relative_q %lf %lf %lf %lf \n", relative_q.w(), relative_q.x(), relative_q.y(),
-             relative_q.z());
+      // printf("relative_t %lf %lf %lf \n", relative_t.x(), relative_t.y(), relative_t.z());
+      // printf("relative_q %lf %lf %lf %lf \n", relative_q.w(), relative_q.x(), relative_q.y(),
+      //        relative_q.z());
 
       m_optimize_buf.lock();
       optimize_buf.push(cur_kf->index);
@@ -533,4 +534,13 @@ void PoseGraph::publish() {
   }
   pub_base_path.publish(base_path);
   // posegraph_visualization->publish_by(pub_pose_graph, path[sequence_cnt].header);
+
+  if (!loop_pairs.empty()) {
+    std_msgs::Int32MultiArray loop_pairs_msg;
+    for (int i = 0; i < (int)loop_pairs.size(); i++) {
+      loop_pairs_msg.data.push_back(loop_pairs[i].first);
+      loop_pairs_msg.data.push_back(loop_pairs[i].second);
+    }
+    pub_loop_pairs.publish(loop_pairs_msg);
+  }
 }

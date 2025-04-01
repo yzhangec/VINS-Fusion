@@ -11,44 +11,41 @@
 
 #pragma once
 
-#include "ThirdParty/DBoW/DBoW2.h"
-#include "ThirdParty/DBoW/TemplatedDatabase.h"
-#include "ThirdParty/DBoW/TemplatedVocabulary.h"
-#include "ThirdParty/DVision/DVision.h"
-#include "keyframe.h"
-#include "utility/CameraPoseVisualization.h"
-#include "utility/tic_toc.h"
-#include "utility/utility.h"
 #include <assert.h>
+#include <mutex>
+#include <queue>
+#include <stdio.h>
+#include <string>
+#include <thread>
+#include <vector>
+
 #include <ceres/ceres.h>
 #include <ceres/rotation.h>
 #include <eigen3/Eigen/Dense>
 #include <faiss/IndexFlat.h>
 #include <geometry_msgs/PointStamped.h>
-#include <mutex>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
 #include <opencv2/opencv.hpp>
-#include <queue>
 #include <ros/ros.h>
 #include <std_msgs/Empty.h>
-#include <stdio.h>
-#include <string>
-#include <thread>
+#include <std_msgs/Int32MultiArray.h>
+
+#include "keyframe.h"
+#include "utility/CameraPoseVisualization.h"
+#include "utility/tic_toc.h"
+#include "utility/utility.h"
 
 #define SHOW_S_EDGE false
 #define SHOW_L_EDGE true
 #define SAVE_LOOP_PATH true
-
-using namespace DVision;
-using namespace DBoW2;
 
 class PoseGraph {
 public:
   PoseGraph();
   ~PoseGraph();
   void registerPub(ros::NodeHandle &n);
-  void addKeyFrame(Keyframe *cur_kf, bool flag_detect_loop);
+  void addKeyFrame(Keyframe *cur_kf, bool use_gt = false);
   void setIMUFlag(bool _use_imu);
   Keyframe *getKeyFrame(int index);
   nav_msgs::Path path[10];
@@ -62,6 +59,7 @@ public:
   Vector3d w_t_vio;
   Matrix3d w_r_vio;
   faiss::IndexFlatIP faiss_index;
+  std::vector<std::pair<int, int>> loop_pairs;
 
 private:
   int detectLoopML(Keyframe *keyframe, int frame_index);
@@ -88,7 +86,8 @@ private:
   ros::Publisher pub_base_path;
   ros::Publisher pub_pose_graph;
   ros::Publisher pub_opt;
-  ros::Publisher pub_path[10]; // used for publish different sequence
+  ros::Publisher pub_path[10];   // used for publish different sequence
+  ros::Publisher pub_loop_pairs; // publish img_seq for each loop pair
 };
 
 template <typename T> inline void QuaternionInverse(const T q[4], T q_inverse[4]) {

@@ -341,7 +341,7 @@ void pubTF(const Estimator &estimator, const std_msgs::Header &header) {
   q.setY(correct_q.y());
   q.setZ(correct_q.z());
   transform.setRotation(q);
-  br.sendTransform(tf::StampedTransform(transform, header.stamp, "world", "body"));
+  // br.sendTransform(tf::StampedTransform(transform, header.stamp, "world", "body"));
 
   // camera frame
   transform.setOrigin(
@@ -351,7 +351,7 @@ void pubTF(const Estimator &estimator, const std_msgs::Header &header) {
   q.setY(Quaterniond(estimator.ric[0]).y());
   q.setZ(Quaterniond(estimator.ric[0]).z());
   transform.setRotation(q);
-  br.sendTransform(tf::StampedTransform(transform, header.stamp, "body", "camera"));
+  // br.sendTransform(tf::StampedTransform(transform, header.stamp, "body", "camera"));
 
   nav_msgs::Odometry odometry;
   odometry.header = header;

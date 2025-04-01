@@ -291,7 +291,7 @@ void Estimator::processMeasurements() {
       pubCameraPose(*this, header);
       pubPointCloud(*this, header);
       pubKeyframe(*this);
-      // pubTF(*this, header);
+      pubTF(*this, header);
       mProcess.unlock();
     }
 

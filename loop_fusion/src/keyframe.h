@@ -11,8 +11,6 @@
 
 #pragma once
 
-#include "ThirdParty/DBoW/DBoW2.h"
-#include "ThirdParty/DVision/DVision.h"
 #include "camodocal/camera_models/CameraFactory.h"
 #include "camodocal/camera_models/CataCamera.h"
 #include "camodocal/camera_models/PinholeCamera.h"
@@ -28,20 +26,28 @@
 
 using namespace Eigen;
 using namespace std;
-using namespace DVision;
 
 class Keyframe {
 public:
   Keyframe(double _time_stamp, int _index, Vector3d &_vio_T_w_i, Matrix3d &_vio_R_w_i,
            cv::Mat &_image, vector<cv::Point3f> &_point_3d, vector<cv::Point2f> &_point_2d_uv,
            vector<cv::Point2f> &_point_2d_normal, vector<double> &_point_id, int _sequence,
-           std::vector<float> &_global_desc, std::vector<float> &_local_desc);
-  bool findConnection(Keyframe *old_kf);
+           std::vector<float> &_global_desc, std::vector<float> &_local_desc, int _img_seq);
+  bool findConnection(Keyframe *old_kf, bool use_gt = false);
   void getVioPose(Eigen::Vector3d &_T_w_i, Eigen::Matrix3d &_R_w_i);
   void getPose(Eigen::Vector3d &_T_w_i, Eigen::Matrix3d &_R_w_i);
   void updatePose(const Eigen::Vector3d &_T_w_i, const Eigen::Matrix3d &_R_w_i);
   void updateVioPose(const Eigen::Vector3d &_T_w_i, const Eigen::Matrix3d &_R_w_i);
   void updateLoop(Eigen::Matrix<double, 8, 1> &_loop_info);
+
+  void setGrountTruthPose(Eigen::Vector3d &_T_w_i_gt, Eigen::Matrix3d &_R_w_i_gt) {
+    T_w_i_gt = _T_w_i_gt;
+    R_w_i_gt = _R_w_i_gt;
+  }
+  void getGroundTruthPose(Eigen::Vector3d &_T_w_i_gt, Eigen::Matrix3d &_R_w_i_gt) {
+    _T_w_i_gt = T_w_i_gt;
+    _R_w_i_gt = R_w_i_gt;
+  }
 
   Eigen::Vector3d getLoopRelativeT();
   double getLoopRelativeYaw();
@@ -62,6 +68,8 @@ public:
   Eigen::Matrix3d vio_R_w_i;
   Eigen::Vector3d T_w_i;
   Eigen::Matrix3d R_w_i;
+  Eigen::Vector3d T_w_i_gt;
+  Eigen::Matrix3d R_w_i_gt;
   Eigen::Vector3d origin_vio_T;
   Eigen::Matrix3d origin_vio_R;
   cv::Mat image;
@@ -73,8 +81,8 @@ public:
   vector<cv::KeyPoint> keypoints;
   vector<cv::KeyPoint> keypoints_norm;
   vector<cv::KeyPoint> window_keypoints;
-  bool has_fast_point;
   int sequence;
+  int img_seq;
 
   bool has_loop;
   int loop_index;

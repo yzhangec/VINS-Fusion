@@ -11,6 +11,7 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 find_package(OpenCV)
 find_package(Ceres REQUIRED)
 find_package(Eigen3)
+find_package(PCL 1.7 REQUIRED)
 find_package(catkin REQUIRED COMPONENTS
     roscpp
     std_msgs
@@ -25,7 +26,7 @@ include_directories(SYSTEM include ${catkin_INCLUDE_DIRS} ${CERES_INCLUDE_DIRS} 
 
 set(Torch_DIR "$ENV{HOME}/source/libtorch/share/cmake/Torch")
 find_package(Torch REQUIRED)
-include_directories(${TORCH_INCLUDE_DIRS} ${active_loop_INCLUDE_DIRS})
+include_directories(${TORCH_INCLUDE_DIRS} ${PCL_INCLUDE_DIRS} ${active_loop_INCLUDE_DIRS})
 
 add_message_files(
   FILES
@@ -38,27 +39,24 @@ generate_messages(
   sensor_msgs
 )
 
-add_executable(loop_fusion_node
-    src/pose_graph_node.cpp
-    src/pose_graph.cpp
-    src/keyframe.cpp
-    src/utility/CameraPoseVisualization.cpp
-    src/ThirdParty/DBoW/BowVector.cpp
-    src/ThirdParty/DBoW/FBrief.cpp
-    src/ThirdParty/DBoW/FeatureVector.cpp
-    src/ThirdParty/DBoW/QueryResults.cpp
-    src/ThirdParty/DBoW/ScoringObject.cpp
-    src/ThirdParty/DUtils/Random.cpp
-    src/ThirdParty/DUtils/Timestamp.cpp
-    src/ThirdParty/DVision/BRIEF.cpp
-    src/ThirdParty/VocabularyBinary.cpp
-    src/CNN/superpoint_common.cpp 
-    src/CNN/superpoint_onnx.cpp
-    )
+link_directories(${PCL_LIBRARY_DIRS})
 
-target_link_libraries(loop_fusion_node ${catkin_LIBRARIES}  ${OpenCV_LIBS} ${CERES_LIBRARIES}
-    ${TORCH_LIBRARIES}
-    onnxruntime
-    faiss
-    dw
+add_executable(loop_fusion_node
+  src/pose_graph_node.cpp
+  src/pose_graph.cpp
+  src/keyframe.cpp
+  src/utility/CameraPoseVisualization.cpp
+  src/CNN/superpoint_common.cpp 
+  src/CNN/superpoint_onnx.cpp
+)
+
+target_link_libraries(loop_fusion_node 
+  ${catkin_LIBRARIES}  
+  ${OpenCV_LIBS} 
+  ${CERES_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${TORCH_LIBRARIES} 
+  onnxruntime
+  faiss
+  dw
 ) 

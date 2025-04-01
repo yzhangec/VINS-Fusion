@@ -45,7 +45,7 @@ Keyframe::Keyframe(double _time_stamp, int _index, Vector3d &_vio_T_w_i, Matrix3
                    cv::Mat &_image, vector<cv::Point3f> &_point_3d,
                    vector<cv::Point2f> &_point_2d_uv, vector<cv::Point2f> &_point_2d_norm,
                    vector<double> &_point_id, int _sequence, std::vector<float> &_global_desc,
-                   std::vector<float> &_local_desc) {
+                   std::vector<float> &_local_desc, int _img_seq) {
   time_stamp = _time_stamp;
   index = _index;
   vio_T_w_i = _vio_T_w_i;
@@ -64,14 +64,53 @@ Keyframe::Keyframe(double _time_stamp, int _index, Vector3d &_vio_T_w_i, Matrix3
   point_id = _point_id;
   has_loop = false;
   loop_index = -1;
-  has_fast_point = false;
   loop_info << 0, 0, 0, 0, 0, 0, 0, 0;
   sequence = _sequence;
+  img_seq = _img_seq;
   global_desc = _global_desc;
   local_desc = _local_desc;
 }
 
-bool Keyframe::findConnection(Keyframe *old_kf) {
+bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
+  if (use_gt) {
+    // std::cout << "use ground truth pose" << std::endl;
+    // std::cout << "old_kf->R_w_i_gt:" << std::endl;
+    // std::cout << old_kf->R_w_i_gt << std::endl;
+    // std::cout << "old_kf->T_w_i_gt:" << std::endl;
+    // std::cout << old_kf->T_w_i_gt << std::endl;
+    // std::cout << "R_w_i:" << std::endl;
+    // std::cout << R_w_i << std::endl;
+    // std::cout << "T_w_i:" << std::endl;
+    // std::cout << T_w_i << std::endl;
+
+    Eigen::Vector3d relative_t = old_kf->R_w_i_gt.transpose() * (T_w_i_gt - old_kf->T_w_i_gt);
+    Eigen::Quaterniond relative_q(old_kf->R_w_i_gt.transpose() * R_w_i_gt); 
+    double relative_yaw = Utility::normalizeAngle(Utility::R2ypr(R_w_i_gt).x() -
+                                                  Utility::R2ypr(old_kf->R_w_i_gt).x());
+    // std::cout << "Utility::R2ypr(R_w_i_gt).x():" << Utility::R2ypr(R_w_i_gt).x() << std::endl;
+    // std::cout << "Utility::R2ypr(old_kf->R_w_i_gt).x():" << Utility::R2ypr(old_kf->R_w_i_gt).x() << std::endl;
+
+    // std::cout << "relative_t:" << std::endl;
+    // std::cout << relative_t << std::endl;
+    // std::cout << "relative_q:" << std::endl;
+    // std::cout << relative_q.coeffs() << std::endl;
+    // std::cout << "relative_yaw:" << std::endl;
+    // std::cout << relative_yaw << std::endl;
+
+    // only for t within 1m and yaw within 30 degree
+    if (relative_t.norm() > 1 || fabs(relative_yaw) > 30) {
+      // std::cout << "relative_t.norm():" << relative_t.norm() << std::endl;
+      // std::cout << "fabs(relative_yaw):" << fabs(relative_yaw) << std::endl;
+      return false;
+    }
+
+    has_loop = true;
+    loop_index = old_kf->index;
+    loop_info << relative_t.x(), relative_t.y(), relative_t.z(), relative_q.w(), relative_q.x(),
+        relative_q.y(), relative_q.z(), relative_yaw;
+    return true;
+  }
+
   TicToc tmp_t;
   // printf("find Connection\n");
   vector<cv::Point2f> matched_2d_cur, matched_2d_old;
@@ -331,6 +370,7 @@ bool Keyframe::findConnection(Keyframe *old_kf) {
       cv::waitKey(1);
     }
 
+    // PnP_R_old: R_w_old, PnP_T_old: T_w_old
     relative_t = PnP_R_old.transpose() * (origin_vio_T - PnP_T_old);
     relative_q = PnP_R_old.transpose() * origin_vio_R;
     relative_yaw =
@@ -344,8 +384,8 @@ bool Keyframe::findConnection(Keyframe *old_kf) {
       loop_index = old_kf->index;
       loop_info << relative_t.x(), relative_t.y(), relative_t.z(), relative_q.w(), relative_q.x(),
           relative_q.y(), relative_q.z(), relative_yaw;
-      cout << "pnp relative_t " << relative_t.transpose() << endl;
-      cout << "pnp relative_q " << relative_q.w() << " " << relative_q.vec().transpose() << endl;
+      // cout << "pnp relative_t " << relative_t.transpose() << endl;
+      // cout << "pnp relative_q " << relative_q.w() << " " << relative_q.vec().transpose() << endl;
       return true;
     }
   }
