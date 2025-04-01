@@ -1,0 +1,5 @@
+<launch>
+
+  <node name="vins_estimator" pkg="vins" type="vins_node" output="log" args="/home/cindy/workspace/Active_Exploration_ws/src/VINS-Fusion/config/uav_simulator/uav_simulator.yaml" />
+
+</launch>

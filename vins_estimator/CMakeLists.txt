@@ -14,7 +14,8 @@ find_package(catkin REQUIRED COMPONENTS
     cv_bridge
     camera_models
     pcl_ros
-    image_transport)
+    image_transport
+    exploration_utils)
 
 find_package(OpenCV REQUIRED)
 
@@ -64,9 +65,9 @@ target_link_libraries(vins_feature_node vins_lib)
 # add_executable(vins_cov_node src/covarianceTest.cpp)
 # target_link_libraries(vins_cov_node vins_lib gtsam) 
 
-add_executable(kitti_odom_test src/KITTIOdomTest.cpp)
-target_link_libraries(kitti_odom_test vins_lib) 
+# add_executable(kitti_odom_test src/KITTIOdomTest.cpp)
+# target_link_libraries(kitti_odom_test vins_lib) 
 
-add_executable(kitti_gps_test src/KITTIGPSTest.cpp)
-target_link_libraries(kitti_gps_test vins_lib) 
+# add_executable(kitti_gps_test src/KITTIGPSTest.cpp)
+# target_link_libraries(kitti_gps_test vins_lib) 
 

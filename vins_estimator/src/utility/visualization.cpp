@@ -46,7 +46,7 @@ void registerPub(ros::NodeHandle &n) {
   pub_camera_pose = n.advertise<geometry_msgs::PoseStamped>("camera_pose", 1000);
   pub_camera_pose_visual = n.advertise<visualization_msgs::MarkerArray>("camera_pose_visual", 1000);
   pub_keyframe_pose = n.advertise<nav_msgs::Odometry>("keyframe_pose", 1000);
-  pub_keyframe_point = n.advertise<sensor_msgs::PointCloud2>("keyframe_point", 1000);
+  pub_keyframe_point = n.advertise<sensor_msgs::PointCloud>("keyframe_point", 1000);
   pub_extrinsic = n.advertise<nav_msgs::Odometry>("extrinsic", 1000);
   pub_image_track = n.advertise<sensor_msgs::Image>("image_track", 1000);
 
@@ -292,10 +292,15 @@ void pubPointCloud(const Estimator &estimator, const std_msgs::Header &header) {
 
   pcl::PointCloud<pcl::PointXYZ> margin_cloud;
 
+  // std::cout << "publish margin cloud" << std::endl;
+  // std::cout << "estimator.f_manager.feature.size(): " << estimator.f_manager.feature.size()
+  //           << std::endl;
+
   for (auto &it_per_id : estimator.f_manager.feature) {
     int used_num = it_per_id.feature_per_frame.size();
     if (!(used_num >= 8 && it_per_id.start_frame < WINDOW_SIZE - 2))
       continue;
+    }
     // if (it_per_id->start_frame > WINDOW_SIZE * 3.0 / 4.0 || it_per_id->solve_flag != 1)
     //        continue;
 
@@ -343,7 +348,7 @@ void pubTF(const Estimator &estimator, const std_msgs::Header &header) {
   q.setY(correct_q.y());
   q.setZ(correct_q.z());
   transform.setRotation(q);
-  br.sendTransform(tf::StampedTransform(transform, header.stamp, "world", "body"));
+  // br.sendTransform(tf::StampedTransform(transform, header.stamp, "world", "body"));
 
   // camera frame
   transform.setOrigin(
@@ -353,7 +358,7 @@ void pubTF(const Estimator &estimator, const std_msgs::Header &header) {
   q.setY(Quaterniond(estimator.ric[0]).y());
   q.setZ(Quaterniond(estimator.ric[0]).z());
   transform.setRotation(q);
-  br.sendTransform(tf::StampedTransform(transform, header.stamp, "body", "camera"));
+  // br.sendTransform(tf::StampedTransform(transform, header.stamp, "body", "camera"));
 
   nav_msgs::Odometry odometry;
   odometry.header = header;
