@@ -61,8 +61,8 @@ target_link_libraries(vins_node vins_lib)
 add_executable(vins_feature_node src/featureTest.cpp)
 target_link_libraries(vins_feature_node vins_lib) 
 
-add_executable(vins_cov_node src/covarianceTest.cpp)
-target_link_libraries(vins_cov_node vins_lib gtsam) 
+# add_executable(vins_cov_node src/covarianceTest.cpp)
+# target_link_libraries(vins_cov_node vins_lib gtsam) 
 
 add_executable(kitti_odom_test src/KITTIOdomTest.cpp)
 target_link_libraries(kitti_odom_test vins_lib) 

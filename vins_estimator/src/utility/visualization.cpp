@@ -31,6 +31,9 @@ static Vector3d last_path(0.0, 0.0, 0.0);
 
 size_t pub_counter = 0;
 
+double last_pub_margin = 0;
+const double pub_margin_time = 0.1; // 50Hz
+
 void registerPub(ros::NodeHandle &n) {
   pub_latest_odometry = n.advertise<nav_msgs::Odometry>("imu_propagate", 1000);
   pub_latest_camera_pose =
@@ -275,18 +278,30 @@ void pubPointCloud(const Estimator &estimator, const std_msgs::Header &header) {
   pub_point_cloud.publish(point_cloud_msg);
 
   // pub margined potin
+  bool pub_margin = true;
+  if (fabs(last_pub_margin) > 1e-4) {
+    double interval = header.stamp.toSec() - last_pub_margin;
+    if (interval < pub_margin_time)
+      pub_margin = false;
+  }
+
+  if (!pub_margin)
+    return;
+
+  last_pub_margin = header.stamp.toSec();
+
   pcl::PointCloud<pcl::PointXYZ> margin_cloud;
 
   for (auto &it_per_id : estimator.f_manager.feature) {
-    int used_num;
-    used_num = it_per_id.feature_per_frame.size();
-    if (!(used_num >= 2 && it_per_id.start_frame < WINDOW_SIZE - 2))
+    int used_num = it_per_id.feature_per_frame.size();
+    if (!(used_num >= 8 && it_per_id.start_frame < WINDOW_SIZE - 2))
       continue;
     // if (it_per_id->start_frame > WINDOW_SIZE * 3.0 / 4.0 || it_per_id->solve_flag != 1)
     //        continue;
 
-    if (it_per_id.start_frame == 0 && it_per_id.feature_per_frame.size() <= 2 &&
-        it_per_id.solve_flag == 1) {
+    // if (it_per_id.start_frame == 0 && it_per_id.feature_per_frame.size() <= 2 &&
+    //     it_per_id.solve_flag == 1) {
+    if (it_per_id.start_frame < WINDOW_SIZE / 4.0 && it_per_id.solve_flag == 1) {
       int imu_i = it_per_id.start_frame;
       Vector3d pts_i = it_per_id.feature_per_frame[0].point * it_per_id.estimated_depth;
       Vector3d w_pts_i =

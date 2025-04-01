@@ -1,5 +1,5 @@
 <launch>
-  <node name="vins_estimator" pkg="vins" type="vins_node" output="screen" args="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/realsense_d435i/realsense_stereo_imu_config.yaml" />
 
-  <node pkg="rosbag" type="play" name="player" output="log" args="--clock --delay 1 /home/eason/bag/vins_2025-02-07-13-52-17.bag"/>
+  <node name="vins_estimator" pkg="vins" type="vins_node" output="log" args="/home/cindy/workspace/Active_Exploration_ws/src/VINS-Fusion/config/uav_simulator/uav_simulator.yaml" />
+
 </launch>
