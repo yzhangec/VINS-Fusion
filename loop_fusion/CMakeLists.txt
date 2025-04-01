@@ -41,22 +41,22 @@ generate_messages(
 
 link_directories(${PCL_LIBRARY_DIRS})
 
-add_executable(loop_fusion_node
-  src/pose_graph_node.cpp
-  src/pose_graph.cpp
-  src/keyframe.cpp
-  src/utility/CameraPoseVisualization.cpp
-  src/CNN/superpoint_common.cpp 
-  src/CNN/superpoint_onnx.cpp
-)
+# add_executable(loop_fusion_node
+#   src/pose_graph_node.cpp
+#   src/pose_graph.cpp
+#   src/keyframe.cpp
+#   src/utility/CameraPoseVisualization.cpp
+#   src/CNN/superpoint_common.cpp 
+#   src/CNN/superpoint_onnx.cpp
+# )
 
-target_link_libraries(loop_fusion_node 
-  ${catkin_LIBRARIES}  
-  ${OpenCV_LIBS} 
-  ${CERES_LIBRARIES}
-  ${PCL_LIBRARIES}
-  ${TORCH_LIBRARIES} 
-  onnxruntime
-  faiss
-  dw
-) 
+# target_link_libraries(loop_fusion_node 
+#   ${catkin_LIBRARIES}  
+#   ${OpenCV_LIBS} 
+#   ${CERES_LIBRARIES}
+#   ${PCL_LIBRARIES}
+#   ${TORCH_LIBRARIES} 
+#   onnxruntime
+#   faiss
+#   dw
+# ) 
