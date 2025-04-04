@@ -62,6 +62,9 @@ target_link_libraries(vins_node vins_lib)
 add_executable(vins_feature_node src/featureTest.cpp)
 target_link_libraries(vins_feature_node vins_lib) 
 
+add_executable(test_stereo_feature test/test_stereo_feature.cpp)
+target_link_libraries(test_stereo_feature vins_lib) 
+
 # add_executable(vins_cov_node src/covarianceTest.cpp)
 # target_link_libraries(vins_cov_node vins_lib gtsam) 
 

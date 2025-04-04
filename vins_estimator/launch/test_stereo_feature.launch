@@ -1,0 +1,48 @@
+<launch>
+  <arg name="enable_bag" default="true" />
+  <node pkg="vins" name="test_stereo_feature" type="test_stereo_feature" output="screen">
+    <param name="mode" value="0" />
+  </node>
+
+  <group if="$(arg enable_bag)">
+    <node pkg="rosbag" type="play" name="player" output="log" args="--clock --delay 1 /home/eason/bag/vins_uav_simulator_2025-04-03-17-42-57.bag" />
+  </group>
+
+  <!-- 
+vins_uav_simulator_2025-04-03-14-03-54.bag
+z+1. x+1
+
+vins_uav_simulator_2025-04-03-16-58-18.bag
+z+1. x+1, hover
+
+vins_uav_simulator_2025-04-03-17-03-53.bag
+0,0 hover 
+
+vins_uav_simulator_2025-04-03-17-40-04.bag
+z+1, hover
+mean pixel error: 0.019588
+sd pixel error: 0.0656303
+
+vins_uav_simulator_2025-04-03-17-42-57.bag
+z+1, hover, map shift -1 (equal to z+1. x+1, hover)
+mean pixel error: 0.0725454
+sd pixel error: 0.080222
+
+vins_uav_simulator_2025-04-03-17-46-22.bag
+z+1, hover, map shift -2
+mean pixel error: 0.336326
+sd pixel error: 0.754527
+
+vins_uav_simulator_2025-04-03-19-10-26.bag
+z+1, hover, brick
+mean pixel error: 0.414912
+sd pixel error: 0.916579
+
+vins_uav_simulator_2025-04-03-19-17-26.bag
+z+1, hover, brick, map shift -1
+mean pixel error: 0.471888
+sd pixel error: 1.07086
+
+-->
+
+</launch>
