@@ -1,11 +1,11 @@
 <launch>
   <arg name="enable_loop" default="false" />
 
-  <node name="vins_estimator" pkg="vins" type="vins_node" output="log" args="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/realsense_d435i/realsense_stereo_imu_config.yaml" />
+  <node name="vins_estimator" pkg="vins" type="vins_node" output="log" args="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/uav_simulator/uav_simulator.yaml" />
 
   <group if="$(arg enable_loop)">
     <node name="loop_fusion" pkg="loop_fusion" type="loop_fusion_node" output="screen" args="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/realsense_d435i/realsense_stereo_imu_config.yaml" />
   </group>
 
-  <node pkg="rosbag" type="play" name="player" output="log" args="--clock --delay 1 /home/eason/bag/vins_2025-02-07-13-52-17.bag"/>
+  <node pkg="rosbag" type="play" name="player" output="log" args="--clock --delay 1 /home/eason/bag/vins_debug_drift_2025-04-05-16-51-01.bag"/>
 </launch>
