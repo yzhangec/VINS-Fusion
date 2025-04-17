@@ -1,5 +1,5 @@
 <launch>
-  <node name="vins_estimator" pkg="vins" type="vins_node" output="log" args="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/uav_simulator/uav_simulator.yaml" />
+  <node name="vins_estimator" pkg="vins" type="vins_node" output="log" args="$(env HOME)/workspace/exploration_ws/src/VINS-Fusion/config/uav_simulator/uav_simulator.yaml" />
 
-  <node pkg="rosbag" type="play" name="player" output="screen" args="--clock --delay 1 /home/eason/bag/vins_debug_eason_2025-03-01-13-37-01.bag"/>
+  <node pkg="rosbag" type="play" name="player" output="log" args="--clock --delay 1 $(env HOME)/bag/vins_start_2025-04-17-16-40-01.bag"/>
 </launch>
