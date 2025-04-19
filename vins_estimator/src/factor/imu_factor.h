@@ -70,7 +70,15 @@ class IMUFactor : public ceres::SizedCostFunction<15, 7, 9, 7, 9>
         residual = pre_integration->evaluate(Pi, Qi, Vi, Bai, Bgi,
                                             Pj, Qj, Vj, Baj, Bgj);
 
-        Eigen::Matrix<double, 15, 15> sqrt_info = Eigen::LLT<Eigen::Matrix<double, 15, 15>>(pre_integration->covariance.inverse()).matrixL().transpose();
+        // Eigen::Matrix<double, 15, 15> sqrt_info = Eigen::LLT<Eigen::Matrix<double, 15, 15>>(pre_integration->covariance.inverse()).matrixL().transpose();
+
+        // Eigen::LLT<Eigen::Matrix<double, 15, 15>> llt(pre_integration->covariance);
+        // Eigen::Matrix<double, 15, 15> L = llt.matrixL(); // Lower Cholesky factor
+        // Eigen::Matrix<double, 15, 15> sqrt_info = L.inverse().transpose();
+
+        Eigen::Matrix<double, 15, 15> L = Eigen::LLT<Eigen::Matrix<double, 15, 15>>(pre_integration->covariance).matrixL();
+        Eigen::Matrix<double, 15, 15> sqrt_info = (L.triangularView<Eigen::Lower>().solve(Eigen::Matrix<double, 15, 15>::Identity())).transpose();
+
         //sqrt_info.setIdentity();
         residual = sqrt_info * residual;
 

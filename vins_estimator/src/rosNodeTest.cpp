@@ -9,17 +9,20 @@
  * Author: Qin Tong (qintonguav@gmail.com)
  *******************************************************/
 
+#include <map>
+#include <mutex>
+#include <queue>
+#include <stdio.h>
+#include <thread>
+
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/opencv.hpp>
+#include <ros/ros.h>
+#include <std_msgs/Int32.h>
+
 #include "estimator/estimator.h"
 #include "estimator/parameters.h"
 #include "utility/visualization.h"
-#include <cv_bridge/cv_bridge.h>
-#include <map>
-#include <mutex>
-#include <opencv2/opencv.hpp>
-#include <queue>
-#include <ros/ros.h>
-#include <stdio.h>
-#include <thread>
 
 Estimator estimator;
 
@@ -29,13 +32,29 @@ queue<sensor_msgs::ImageConstPtr> img0_buf;
 queue<sensor_msgs::ImageConstPtr> img1_buf;
 std::mutex m_buf;
 
+// UAV simulator imu steady hack
+bool imu_ready = false;
+void imu_ready_callback(const std_msgs::Int32ConstPtr &msg) {
+  if (msg->data > 0) {
+    imu_ready = true;
+  }
+}
+
 void img0_callback(const sensor_msgs::ImageConstPtr &img_msg) {
+  if (!imu_ready) {
+    return;
+  }
+
   m_buf.lock();
   img0_buf.push(img_msg);
   m_buf.unlock();
 }
 
 void img1_callback(const sensor_msgs::ImageConstPtr &img_msg) {
+  if (!imu_ready) {
+    return;
+  }
+
   m_buf.lock();
   img1_buf.push(img_msg);
   m_buf.unlock();
@@ -113,6 +132,10 @@ void sync_process() {
 }
 
 void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg) {
+  if (!imu_ready) {
+    return;
+  }
+
   double t = imu_msg->header.stamp.toSec();
   double dx = imu_msg->linear_acceleration.x;
   double dy = imu_msg->linear_acceleration.y;
@@ -228,6 +251,9 @@ int main(int argc, char **argv) {
   ros::Subscriber sub_restart = n.subscribe("/vins_restart", 100, restart_callback);
   ros::Subscriber sub_imu_switch = n.subscribe("/vins_imu_switch", 100, imu_switch_callback);
   ros::Subscriber sub_cam_switch = n.subscribe("/vins_cam_switch", 100, cam_switch_callback);
+
+  ros::Subscriber imu_ready_sub =
+      n.subscribe("/planning/ready", 100, imu_ready_callback, ros::TransportHints().tcpNoDelay());
 
   std::thread sync_thread{sync_process};
   ros::spin();
