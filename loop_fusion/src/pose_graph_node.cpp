@@ -22,6 +22,7 @@
 #include <nav_msgs/Path.h>
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/opencv.hpp>
+#include <pcl_conversions/pcl_conversions.h>
 #include <queue>
 #include <ros/package.h>
 #include <ros/ros.h>
@@ -33,7 +34,6 @@
 #include <thread>
 #include <vector>
 #include <visualization_msgs/Marker.h>
-#include <pcl_conversions/pcl_conversions.h>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
@@ -580,15 +580,6 @@ void process() {
       //   ptr1 = cv_bridge::toCvCopy(image1_msg, sensor_msgs::image_encodings::MONO8);
       // }
 
-      Eigen::Vector3d T_w_i_gt =
-          Eigen::Vector3d(pose_gt_msg->pose.pose.position.x, pose_gt_msg->pose.pose.position.y,
-                          pose_gt_msg->pose.pose.position.z);
-      Eigen::Matrix3d R_w_i_gt = Eigen::Quaterniond(pose_gt_msg->pose.pose.orientation.w,
-                                                    pose_gt_msg->pose.pose.orientation.x,
-                                                    pose_gt_msg->pose.pose.orientation.y,
-                                                    pose_gt_msg->pose.pose.orientation.z)
-                                     .toRotationMatrix();
-
       cv_bridge::CvImageConstPtr ptr0, ptr1;
       ptr0 = cv_bridge::toCvCopy(*image0_msg, sensor_msgs::image_encodings::MONO8);
       ptr1 = cv_bridge::toCvCopy(*image1_msg, sensor_msgs::image_encodings::MONO8);
@@ -710,8 +701,18 @@ void process() {
         Keyframe *keyframe = new Keyframe(
             pose_msg->header.stamp.toSec(), frame_index, T, R, image0, point_3d, point_2d_uv,
             point_2d_normal, point_id, sequence, global_desc, local_desc, image0_msg->header.seq);
-        if (has_gt_pose)
+        if (has_gt_pose) {
+          Eigen::Vector3d T_w_i_gt =
+              Eigen::Vector3d(pose_gt_msg->pose.pose.position.x, pose_gt_msg->pose.pose.position.y,
+                              pose_gt_msg->pose.pose.position.z);
+          Eigen::Matrix3d R_w_i_gt = Eigen::Quaterniond(pose_gt_msg->pose.pose.orientation.w,
+                                                        pose_gt_msg->pose.pose.orientation.x,
+                                                        pose_gt_msg->pose.pose.orientation.y,
+                                                        pose_gt_msg->pose.pose.orientation.z)
+                                         .toRotationMatrix();
+
           keyframe->setGrountTruthPose(T_w_i_gt, R_w_i_gt);
+        }
         m_process.lock();
         start_flag = 1;
         posegraph.addKeyFrame(keyframe, has_gt_pose);
@@ -744,6 +745,12 @@ int main(int argc, char **argv) {
 
   string config_file = argv[1];
   printf("config_file: %s\n", argv[1]);
+
+  // if not exists
+  if (access(config_file.c_str(), 0) == -1) {
+    printf("config file not exists, please check the path\n");
+    return 0;
+  }
 
   cv::FileStorage fsSettings(config_file, cv::FileStorage::READ);
   if (!fsSettings.isOpened()) {
@@ -786,10 +793,11 @@ int main(int argc, char **argv) {
   int USE_IMU = fsSettings["imu"];
   posegraph.setIMUFlag(USE_IMU);
 
-  netvlad_onnx =
-      new MobileNetVLADONNX("/home/eason/source/cnn_models/mobilenetvlad_480x640.onnx", 640, 480);
-  superpoint_onnx = new SuperPointONNX("/home/eason/source/cnn_models/superpoint_v1_480x640.onnx",
-                                       std::string(), std::string(), 640, 480, 0.2, 200);
+  netvlad_onnx = new MobileNetVLADONNX(
+      string(getenv("HOME")) + "/source/cnn_models/mobilenetvlad_480x640.onnx", 640, 480);
+  superpoint_onnx =
+      new SuperPointONNX(string(getenv("HOME")) + "/source/cnn_models/superpoint_v1_480x640.onnx",
+                         std::string(), std::string(), 640, 480, 0.2, 200);
 
   cv::Mat cv_Tbl, cv_Tbr;
   Eigen::Matrix4d Tbl, Tbr;

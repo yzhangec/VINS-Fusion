@@ -1,10 +1,9 @@
 <launch>
-  <arg name="enable_vins" default="false" />
+  <arg name="enable_vins" default="true" />
   <arg name="enable_loop" default="true" />
-  <arg name="enable_bag" default="false" />
-  <!-- <arg name="config_file" default="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/realsense_d435i/realsense_stereo_imu_config.yaml" /> -->
-  <arg name="config_file" default="/home/eason/workspace/exploration_ws/src/VINS-Fusion/config/uav_simulator/uav_simulator.yaml" />
-
+  <arg name="enable_bag" default="true" />
+  <arg name="config_file" default="$(env HOME)/workspace/exploration_ws/src/VINS-Fusion/config/realsense_d435i/realsense_stereo_imu_config.yaml" />
+  <!-- <arg name="config_file" default="$(env HOME)/workspace/exploration_ws/src/VINS-Fusion/config/uav_simulator/uav_simulator.yaml" /> -->
 
   <group if="$(arg enable_vins)">
     <node pkg="vins" type="vins_node" name="vins_estimator" output="log" args="$(arg config_file)"/>
@@ -15,7 +14,7 @@
   </group>
 
   <group if="$(arg enable_bag)">
-    <arg name="bag_file" default="/home/eason/source/bag/reconstruction_2021-08-28-22-43-32.bag" />
+    <arg name="bag_file" default="$(env HOME)/bag/vins_2025-02-07-13-52-17.bag" />
     <node pkg="rosbag" type="play" name="player" output="log" args="--clock --delay 1 -s 0 $(arg bag_file)"/>
   </group>
 </launch>

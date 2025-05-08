@@ -1,7 +1,7 @@
 #ifndef ONNX_GENERIC_H
 #define ONNX_GENERIC_H
 
-#include <onnxruntime/core/session/onnxruntime_cxx_api.h>
+#include <onnxruntime/onnxruntime_cxx_api.h>
 
 #include "CNN_generic.h"
 #include "../src/utility/tic_toc.h"
