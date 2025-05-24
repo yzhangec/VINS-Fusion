@@ -91,6 +91,7 @@ Eigen::Matrix3d qic;
 ros::Publisher pub_match_img;
 ros::Publisher pub_camera_pose_visual;
 ros::Publisher pub_odometry_rect;
+ros::Publisher pub_imu_propagate_rect, pub_imu_propagate_camera_pose_rect;
 ros::Publisher debug_marker_array_pub_;
 
 std::string BRIEF_PATTERN_FILE;
@@ -429,6 +430,56 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg) {
   // cameraposevisual.publish_by(pub_camera_pose_visual, pose_msg->header);
 }
 
+void imu_propagate_callback(const nav_msgs::Odometry::ConstPtr &pose_msg) {
+  // ROS_INFO("vio_callback!");
+  Vector3d vio_t(pose_msg->pose.pose.position.x, pose_msg->pose.pose.position.y,
+                 pose_msg->pose.pose.position.z);
+  Quaterniond vio_q;
+  vio_q.w() = pose_msg->pose.pose.orientation.w;
+  vio_q.x() = pose_msg->pose.pose.orientation.x;
+  vio_q.y() = pose_msg->pose.pose.orientation.y;
+  vio_q.z() = pose_msg->pose.pose.orientation.z;
+
+  vio_t = posegraph.w_r_vio * vio_t + posegraph.w_t_vio;
+  vio_q = posegraph.w_r_vio * vio_q;
+
+  vio_t = posegraph.r_drift * vio_t + posegraph.t_drift;
+  vio_q = posegraph.r_drift * vio_q;
+
+  nav_msgs::Odometry odometry;
+  odometry.header = pose_msg->header;
+  odometry.header.frame_id = "world";
+  odometry.pose.pose.position.x = vio_t.x();
+  odometry.pose.pose.position.y = vio_t.y();
+  odometry.pose.pose.position.z = vio_t.z();
+  odometry.pose.pose.orientation.x = vio_q.x();
+  odometry.pose.pose.orientation.y = vio_q.y();
+  odometry.pose.pose.orientation.z = vio_q.z();
+  odometry.pose.pose.orientation.w = vio_q.w();
+  pub_imu_propagate_rect.publish(odometry);
+
+  Vector3d vio_t_cam;
+  Quaterniond vio_q_cam;
+  vio_t_cam = vio_t + vio_q * tic;
+  vio_q_cam = vio_q * qic;
+
+  geometry_msgs::PoseStamped camera_pose;
+  camera_pose.header = pose_msg->header;
+  camera_pose.header.frame_id = "world";
+  camera_pose.pose.position.x = vio_t_cam.x();
+  camera_pose.pose.position.y = vio_t_cam.y();
+  camera_pose.pose.position.z = vio_t_cam.z();
+  camera_pose.pose.orientation.x = vio_q_cam.x();
+  camera_pose.pose.orientation.y = vio_q_cam.y();
+  camera_pose.pose.orientation.z = vio_q_cam.z();
+  camera_pose.pose.orientation.w = vio_q_cam.w();
+  pub_imu_propagate_camera_pose_rect.publish(camera_pose);
+
+  // cameraposevisual.reset();
+  // cameraposevisual.add_pose(vio_t_cam, vio_q_cam);
+  // cameraposevisual.publish_by(pub_camera_pose_visual, pose_msg->header);
+}
+
 void extrinsic_callback(const nav_msgs::Odometry::ConstPtr &pose_msg) {
   m_process.lock();
   tic = Vector3d(pose_msg->pose.pose.position.x, pose_msg->pose.pose.position.y,
@@ -502,9 +553,13 @@ void process() {
 
     m_buf.lock();
     // remove old tuples if tuple size is too large
+    int throw_cnt = 0;
     while (image_pose_buf.size() > 5) {
       image_pose_buf.pop();
-      printf("throw image_pose at beginning\n");
+      throw_cnt++;
+    }
+    if (throw_cnt > 0) {
+      printf("throw %d image_pose_buf tuples\n", throw_cnt);
     }
 
     if (!has_gt_pose) {
@@ -602,6 +657,7 @@ void process() {
         std::vector<float> global_desc;
         std::vector<float> local_desc;
 
+        ros::Time inference_start_time = ros::Time::now();
         if (COL == 848) {
           global_desc = netvlad_onnx->inference(image0(cv::Range(0, 480), cv::Range(124, 764)));
           superpoint_onnx->inference(image0(cv::Range(0, 480), cv::Range(124, 764)), point_2d_uv,
@@ -617,6 +673,7 @@ void process() {
           ROS_ERROR("image size not supported");
           ROS_BREAK();
         }
+        // printf("inference time %f \n", (ros::Time::now() - inference_start_time).toSec());
 
         posegraph.faiss_index.add(1, global_desc.data());
 
@@ -810,6 +867,8 @@ int main(int argc, char **argv) {
   fsSettings.release();
 
   ros::Subscriber sub_vio = n.subscribe("/vins_estimator/odometry", 1, vio_callback);
+  // ros::Subscriber sub_imu_propagate =
+  //     n.subscribe("/vins_estimator/imu_propagate", 1, imu_propagate_callback);
   // ros::Subscriber sub_pose = n.subscribe("/vins_estimator/keyframe_pose", 1, pose_callback);
   // ros::Subscriber sub_pose_gt = n.subscribe("/uav_simulator/odometry", 1, pose_gt_callback);
   ros::Subscriber sub_extrinsic = n.subscribe("/vins_estimator/extrinsic", 1, extrinsic_callback);
@@ -848,6 +907,9 @@ int main(int argc, char **argv) {
   pub_point_cloud = n.advertise<sensor_msgs::PointCloud>("point_cloud_rect", 1000);
   pub_margin_cloud = n.advertise<sensor_msgs::PointCloud2>("margin_cloud_rect", 1000);
   pub_odometry_rect = n.advertise<nav_msgs::Odometry>("odometry_rect", 1000);
+  pub_imu_propagate_rect = n.advertise<nav_msgs::Odometry>("imu_propagate_rect", 1000);
+  pub_imu_propagate_camera_pose_rect =
+      n.advertise<geometry_msgs::PoseStamped>("imu_propagate_camera_pose_rect", 1000);
   debug_marker_array_pub_ = n.advertise<visualization_msgs::MarkerArray>("debug", 100);
 
   std::thread measurement_process;

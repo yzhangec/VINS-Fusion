@@ -78,8 +78,8 @@ void PoseGraph::addKeyFrame(Keyframe *cur_kf, bool use_gt) {
   if (loop_index != -1 && loop_index < cur_kf->index) {
     Keyframe *old_kf = getKeyFrame(loop_index);
     if (cur_kf->findConnection(old_kf, use_gt)) {
-      printf(" %d detect loop with %d , old kf img_seq %d, new kf seq %d \n", cur_kf->index,
-             loop_index, old_kf->img_seq, cur_kf->img_seq);
+      printf("cur_kf idx %d img_seq %d detect loop with old_kf idx %d img_seq %d\n", cur_kf->index,
+             cur_kf->img_seq, loop_index, old_kf->img_seq);
       printf("loop info %lf %lf %lf %lf %lf %lf %lf %lf \n", cur_kf->loop_info(0),
              cur_kf->loop_info(1), cur_kf->loop_info(2), cur_kf->loop_info(3), cur_kf->loop_info(4),
              cur_kf->loop_info(5), cur_kf->loop_info(6), cur_kf->loop_info(7));

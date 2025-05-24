@@ -33,7 +33,7 @@ queue<sensor_msgs::ImageConstPtr> img1_buf;
 std::mutex m_buf;
 
 // UAV simulator imu steady hack
-bool imu_ready = true;
+bool imu_ready = false;
 void imu_ready_callback(const std_msgs::Int32ConstPtr &msg) {
   if (msg->data > 0) {
     imu_ready = true;
@@ -251,6 +251,11 @@ int main(int argc, char **argv) {
   ros::Subscriber sub_restart = n.subscribe("/vins_restart", 100, restart_callback);
   ros::Subscriber sub_imu_switch = n.subscribe("/vins_imu_switch", 100, imu_switch_callback);
   ros::Subscriber sub_cam_switch = n.subscribe("/vins_cam_switch", 100, cam_switch_callback);
+
+  if (IMU_TOPIC.find("simulator") == string::npos) {
+    // Not in simulator mode
+    imu_ready = true;
+  }
 
   ros::Subscriber imu_ready_sub =
       n.subscribe("/planning/ready", 100, imu_ready_callback, ros::TransportHints().tcpNoDelay());
