@@ -89,9 +89,10 @@ int DEBUG_IMAGE;
 Eigen::Vector3d tic;
 Eigen::Matrix3d qic;
 ros::Publisher pub_match_img;
+ros::Publisher pub_camera_poes_rect;
 ros::Publisher pub_camera_pose_visual;
 ros::Publisher pub_odometry_rect;
-ros::Publisher pub_rect_transformation;
+ros::Publisher pub_odometry_drift;
 ros::Publisher debug_marker_array_pub_;
 
 std::string BRIEF_PATTERN_FILE;
@@ -440,7 +441,33 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg) {
   odometry_rect.pose.pose.orientation.y = q_drift.y();
   odometry_rect.pose.pose.orientation.z = q_drift.z();
   odometry_rect.pose.pose.orientation.w = q_drift.w();
-  pub_rect_transformation.publish(odometry_rect);
+  pub_odometry_drift.publish(odometry_rect);
+}
+
+void camera_pose_callback(const geometry_msgs::PoseStamped::ConstPtr &pose_msg) {
+  // ROS_INFO("camera_pose_callback!");
+  Vector3d camera_t(pose_msg->pose.position.x, pose_msg->pose.position.y,
+                    pose_msg->pose.position.z);
+  Quaterniond camera_q;
+  camera_q.w() = pose_msg->pose.orientation.w;
+  camera_q.x() = pose_msg->pose.orientation.x;
+  camera_q.y() = pose_msg->pose.orientation.y;
+  camera_q.z() = pose_msg->pose.orientation.z;
+
+  camera_t = posegraph.r_drift * camera_t + posegraph.t_drift;
+  camera_q = posegraph.r_drift * camera_q;
+  
+  geometry_msgs::PoseStamped camera_pose_rect;
+  camera_pose_rect.header = pose_msg->header;
+  camera_pose_rect.header.frame_id = "world";
+  camera_pose_rect.pose.position.x = camera_t.x();
+  camera_pose_rect.pose.position.y = camera_t.y();
+  camera_pose_rect.pose.position.z = camera_t.z();
+  camera_pose_rect.pose.orientation.x = camera_q.x();
+  camera_pose_rect.pose.orientation.y = camera_q.y();
+  camera_pose_rect.pose.orientation.z = camera_q.z();
+  camera_pose_rect.pose.orientation.w = camera_q.w();
+  pub_camera_poes_rect.publish(camera_pose_rect);
 }
 
 void extrinsic_callback(const nav_msgs::Odometry::ConstPtr &pose_msg) {
@@ -830,6 +857,8 @@ int main(int argc, char **argv) {
   fsSettings.release();
 
   ros::Subscriber sub_vio = n.subscribe("/vins_estimator/odometry", 1, vio_callback);
+  ros::Subscriber sub_camera_pose =
+      n.subscribe("/vins_estimator/camera_pose", 1, camera_pose_callback);
   // ros::Subscriber sub_pose = n.subscribe("/vins_estimator/keyframe_pose", 1, pose_callback);
   // ros::Subscriber sub_pose_gt = n.subscribe("/uav_simulator/odometry", 1, pose_gt_callback);
   ros::Subscriber sub_extrinsic = n.subscribe("/vins_estimator/extrinsic", 1, extrinsic_callback);
@@ -865,10 +894,11 @@ int main(int argc, char **argv) {
   // pub_match_img = n.advertise<sensor_msgs::Image>("match_image", 1000);
   // pub_camera_pose_visual = n.advertise<visualization_msgs::MarkerArray>("camera_pose_visual",
   // 1000);
+  pub_camera_poes_rect = n.advertise<geometry_msgs::PoseStamped>("camera_pose_rect", 1000);
   pub_point_cloud = n.advertise<sensor_msgs::PointCloud>("point_cloud_rect", 1000);
   pub_margin_cloud = n.advertise<sensor_msgs::PointCloud2>("margin_cloud_rect", 1000);
   pub_odometry_rect = n.advertise<nav_msgs::Odometry>("odometry_rect", 1000);
-  pub_rect_transformation = n.advertise<nav_msgs::Odometry>("rect_transformation", 1000);
+  pub_odometry_drift = n.advertise<nav_msgs::Odometry>("odometry_drift", 1000);
   debug_marker_array_pub_ = n.advertise<visualization_msgs::MarkerArray>("debug", 100);
 
   std::thread measurement_process;
