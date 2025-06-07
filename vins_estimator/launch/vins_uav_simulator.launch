@@ -1,5 +1,22 @@
 <launch>
-  <node name="vins_estimator" pkg="vins" type="vins_node" output="screen" args="$(env HOME)/workspace/exploration_ws/src/VINS-Fusion/config/uav_simulator/uav_simulator.yaml" />
+  <arg name="config_file" default="$(find vins)/../config/uav_simulator/uav_simulator.yaml" />
+  <arg name="enable_loop" default="false" />
 
-  <node pkg="rosbag" type="play" name="player" output="log" args="--clock --delay 1 $(env HOME)/bag/vins_start_2025-04-19-17-09-34.bag"/>
+  <node name="vins_estimator" pkg="vins" type="vins_node" output="screen" args="$(arg config_file)" />
+
+  <group if="$(arg enable_loop)">
+    <node name="loop_fusion" pkg="loop_fusion" type="loop_fusion_node" output="screen" args="$(arg config_file)" />
+  </group>
+
+  <arg name="enable_rosbag_play" default="false" />
+  <arg name="bag_play_file" default="$(find vins)/../bag/uav_simulator.bag" />
+  <group if="$(arg enable_rosbag_play)">
+    <node pkg="rosbag" type="play" name="rosbag_play" output ="screen" args="$(arg bag_play_file)" />
+  </group>
+
+  <arg name="enable_rosbag_record" default="false" />
+  <arg name="bag_record_file" default="$(env HOME)/bag/vins" />
+  <group if="$(arg enable_rosbag_record)">
+    <node pkg="rosbag" type="record" name="rosbag_record" output="log" args="-o $(arg bag_record_file) /uav_simulator/color_image_left /uav_simulator/color_image_right /uav_simulator/imu /planning/ready" />
+  </group>
 </launch>

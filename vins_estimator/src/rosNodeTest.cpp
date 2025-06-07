@@ -33,7 +33,9 @@ queue<sensor_msgs::ImageConstPtr> img1_buf;
 std::mutex m_buf;
 
 // UAV simulator imu steady hack
-bool imu_ready = false;
+// set to true after split simulator controller and vins launch
+bool imu_ready = true; 
+
 void imu_ready_callback(const std_msgs::Int32ConstPtr &msg) {
   if (msg->data > 0) {
     imu_ready = true;
