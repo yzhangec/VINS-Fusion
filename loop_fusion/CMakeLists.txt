@@ -7,6 +7,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
 
+find_package(CUDA QUIET)
 find_package(OpenCV)
 find_package(Ceres REQUIRED)
 find_package(Eigen3)
@@ -21,11 +22,11 @@ find_package(catkin REQUIRED COMPONENTS
     message_filters
 )
 
-include_directories(SYSTEM include ${catkin_INCLUDE_DIRS} ${CERES_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR})
-
 set(Torch_DIR "$ENV{HOME}/source/libtorch/share/cmake/Torch")
 find_package(Torch REQUIRED)
-include_directories(${TORCH_INCLUDE_DIRS} ${PCL_INCLUDE_DIRS} ${active_loop_INCLUDE_DIRS})
+include_directories(${TORCH_INCLUDE_DIRS} ${PCL_INCLUDE_DIRS})
+
+include_directories(SYSTEM include ${catkin_INCLUDE_DIRS} ${CERES_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR})
 
 add_message_files(
   FILES
@@ -39,6 +40,10 @@ generate_messages(
 )
 
 link_directories(${PCL_LIBRARY_DIRS})
+
+if(CUDA_FOUND)
+
+add_definitions(-DCUDA_ENVIRONMENT)
 
 add_executable(loop_fusion_node
   src/pose_graph_node.cpp
@@ -59,3 +64,44 @@ target_link_libraries(loop_fusion_node
   faiss
   dw
 ) 
+
+else()
+
+set(OPENVINO_ROOT "/opt/intel/openvino_2023")
+set(OPENVINO_INCLUDE_DIRS "${OPENVINO_ROOT}/runtime/include")
+set(OPENVINO_LIBRARY_DIR "${OPENVINO_ROOT}/runtime/lib/intel64")
+
+if(NOT EXISTS ${OPENVINO_ROOT})
+  message(FATAL_ERROR "OpenVINO root not exits")
+endif()
+
+add_definitions(-DOPENVINO_ENVIRONMENT)
+
+include_directories(
+  ${catkin_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
+  ${OPENVINO_INCLUDE_DIRS}
+)
+
+link_directories(
+  ${OPENVINO_LIBRARY_DIR}
+)
+
+add_executable(loop_fusion_node
+  src/pose_graph_node.cpp
+  src/pose_graph.cpp
+  src/keyframe.cpp
+  src/utility/CameraPoseVisualization.cpp
+)
+
+target_link_libraries(loop_fusion_node 
+  ${catkin_LIBRARIES}  
+  ${OpenCV_LIBS} 
+  ${CERES_LIBRARIES}
+  ${PCL_LIBRARIES}
+  faiss
+  openvino
+  tbb
+  dw
+) 
+endif(CUDA_FOUND)

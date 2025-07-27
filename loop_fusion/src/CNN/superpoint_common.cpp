@@ -3,6 +3,7 @@
 namespace loop_closure {
 void NMS2(std::vector<cv::Point2f> det, cv::Mat conf, std::vector<cv::Point2f> &pts, int border,
           int dist_thresh, int img_width, int img_height, int max_num);
+          
 void getKeyPoints(const cv::Mat &prob, float threshold, std::vector<cv::Point2f> &keypoints,
                   int width, int height, int max_num) {
   TicToc getkps;

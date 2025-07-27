@@ -41,11 +41,19 @@
 #include <message_filters/synchronizer.h>
 #include <message_filters/time_synchronizer.h>
 
+#include "backward/backward.hpp"
+#include "loop_fusion/StereoImage.h"
+
+#ifdef CUDA_ENVIRONMENT
 #include "CNN/mobilenetvlad_onnx.h"
 #include "CNN/onnx_generic.h"
 #include "CNN/superpoint_onnx.h"
-#include "backward/backward.hpp"
-#include "loop_fusion/StereoImage.h"
+using namespace loop_closure;
+#endif
+
+#ifdef OPENVINO_ENVIRONMENT
+#include "OpenVINO/openvino_ros.h"
+#endif
 
 namespace backward {
 backward::SignalHandling sh;
@@ -53,7 +61,6 @@ backward::SignalHandling sh;
 
 #define SKIP_FIRST_CNT 10
 using namespace std;
-using namespace loop_closure;
 
 // queue<loop_fusion::StereoImagePtr> image_buf;
 // queue<sensor_msgs::PointCloudConstPtr> point_buf;
@@ -104,8 +111,16 @@ double last_image_time = -1;
 
 ros::Publisher pub_point_cloud, pub_margin_cloud;
 
+#ifdef CUDA_ENVIRONMENT
 MobileNetVLADONNX *netvlad_onnx = nullptr;
 SuperPointONNX *superpoint_onnx = nullptr;
+#endif
+
+#ifdef OPENVINO_ENVIRONMENT
+OpenVINOInference *netvlad_openvino = nullptr;
+OpenVINOInference *superpoint_openvino = nullptr;
+#endif
+
 Eigen::Matrix4d T_cam_l_r, T_i_c;
 std::vector<camodocal::CameraPtr> stereo_camera_;
 
@@ -456,7 +471,7 @@ void camera_pose_callback(const geometry_msgs::PoseStamped::ConstPtr &pose_msg) 
 
   camera_t = posegraph.r_drift * camera_t + posegraph.t_drift;
   camera_q = posegraph.r_drift * camera_q;
-  
+
   geometry_msgs::PoseStamped camera_pose_rect;
   camera_pose_rect.header = pose_msg->header;
   camera_pose_rect.header.frame_id = "world";
@@ -648,6 +663,9 @@ void process() {
         std::vector<float> local_desc;
 
         ros::Time inference_start_time = ros::Time::now();
+
+#ifdef CUDA_ENVIRONMENT
+
         if (COL == 848) {
           global_desc = netvlad_onnx->inference(image0(cv::Range(0, 480), cv::Range(124, 764)));
           superpoint_onnx->inference(image0(cv::Range(0, 480), cv::Range(124, 764)), point_2d_uv,
@@ -663,7 +681,26 @@ void process() {
           ROS_ERROR("image size not supported");
           ROS_BREAK();
         }
-        // printf("inference time %f \n", (ros::Time::now() - inference_start_time).toSec());
+#endif
+
+#ifdef OPENVINO_ENVIRONMENT
+        if (COL == 848) {
+          global_desc = netvlad_openvino->inference(image0(cv::Range(0, 480), cv::Range(124, 764)));
+          // superpoint_onnx->inference(image0(cv::Range(0, 480), cv::Range(124, 764)), point_2d_uv,
+          //                            local_desc);
+          for (int i = 0; i < (int)point_2d_uv.size(); i++) {
+            point_2d_uv[i].x += 124;
+            point_2d_uv[i].y += 0;
+          }
+        } else if (COL == 640) {
+          global_desc = netvlad_openvino->inference(image0, true);
+          // superpoint_onnx->inference(image0, point_2d_uv, local_desc);
+        } else {
+          ROS_ERROR("image size not supported");
+          ROS_BREAK();
+        }
+#endif
+        printf("inference time %f \n", (ros::Time::now() - inference_start_time).toSec());
 
         posegraph.faiss_index.add(1, global_desc.data());
 
@@ -840,11 +877,20 @@ int main(int argc, char **argv) {
   int USE_IMU = fsSettings["imu"];
   posegraph.setIMUFlag(USE_IMU);
 
+#ifdef CUDA_ENVIRONMENT
   netvlad_onnx = new MobileNetVLADONNX(
       string(getenv("HOME")) + "/source/cnn_models/mobilenetvlad_480x640.onnx", 640, 480);
   superpoint_onnx =
       new SuperPointONNX(string(getenv("HOME")) + "/source/cnn_models/superpoint_v1_480x640.onnx",
                          std::string(), std::string(), 640, 480, 0.2, 200);
+#endif
+
+#ifdef OPENVINO_ENVIRONMENT
+  netvlad_openvino = new OpenVINOInference(string(getenv("HOME")) +
+                                           "/source/cnn_models/mobilenetvlad_480x640.onnx");
+  superpoint_openvino = new OpenVINOInference(string(getenv("HOME")) +
+                                              "/source/cnn_models/superpoint_v1_480x640.onnx");
+#endif
 
   cv::Mat cv_Tbl, cv_Tbr;
   Eigen::Matrix4d Tbl, Tbr;

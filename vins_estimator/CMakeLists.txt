@@ -15,7 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
     camera_models
     pcl_ros
     image_transport
-    exploration_utils)
+)
 
 find_package(OpenCV REQUIRED)
 
@@ -23,7 +23,7 @@ find_package(OpenCV REQUIRED)
 
 find_package(Ceres REQUIRED)
 
-find_package(GTSAM 4.2.0 REQUIRED)
+# find_package(GTSAM 4.2.0 REQUIRED)
 
 include_directories(${catkin_INCLUDE_DIRS} ${CERES_INCLUDE_DIRS})
 
