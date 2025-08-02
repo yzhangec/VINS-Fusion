@@ -27,7 +27,7 @@ public:
 
     // Step 2: Compile the model
     model_ = core_->read_model(config_.model_path);
-    compiled_model_ = core_->compile_model(model, config_.device);
+    compiled_model_ = core_->compile_model(model_, config_.device);
 
     // Step 3: Create inference request
     infer_request_ = compiled_model_.create_infer_request();
