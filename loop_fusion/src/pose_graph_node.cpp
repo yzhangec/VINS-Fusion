@@ -312,6 +312,13 @@ void publishLandmarks(const std::vector<cv::Point3f> &landmarks) {
 void image_pose_callback(const sensor_msgs::ImageConstPtr &image0_msg,
                          const sensor_msgs::ImageConstPtr &image1_msg,
                          const nav_msgs::Odometry::ConstPtr &pose_msg) {
+  static int skip = 0;
+  if (skip % 2 == 1) {
+    skip++;
+    return;
+  }
+  skip++;
+
   m_buf.lock();
   // std::cout << "image_pose_callback" << std::endl;
   // std::cout << "image0_msg ts:" << image0_msg->header.stamp << std::endl;
@@ -559,7 +566,7 @@ void process() {
     m_buf.lock();
     // remove old tuples if tuple size is too large
     int throw_cnt = 0;
-    while (image_pose_buf.size() > 5) {
+    while (image_pose_buf.size() > 2) {
       image_pose_buf.pop();
       throw_cnt++;
     }
@@ -686,15 +693,15 @@ void process() {
 #ifdef OPENVINO_ENVIRONMENT
         if (COL == 848) {
           global_desc = netvlad_openvino->inference(image0(cv::Range(0, 480), cv::Range(124, 764)));
-          // superpoint_onnx->inference(image0(cv::Range(0, 480), cv::Range(124, 764)), point_2d_uv,
-          //                            local_desc);
+          superpoint_openvino->inference(image0(cv::Range(0, 480), cv::Range(124, 764)),
+                                         point_2d_uv, local_desc);
           for (int i = 0; i < (int)point_2d_uv.size(); i++) {
             point_2d_uv[i].x += 124;
             point_2d_uv[i].y += 0;
           }
         } else if (COL == 640) {
           global_desc = netvlad_openvino->inference(image0, true);
-          // superpoint_onnx->inference(image0, point_2d_uv, local_desc);
+          superpoint_openvino->inference(image0, point_2d_uv, local_desc);
         } else {
           ROS_ERROR("image size not supported");
           ROS_BREAK();
@@ -889,12 +896,14 @@ int main(int argc, char **argv) {
   OpenVINOInference::Config netvlad_config;
   netvlad_config.model_path =
       string(getenv("HOME")) + "/source/cnn_models/mobilenetvlad_480x640.onnx";
+  netvlad_config.model_name = "mobilenetvlad";
   netvlad_config.device = "CPU";
   netvlad_openvino = new OpenVINOInference(netvlad_config);
 
   OpenVINOInference::Config superpoint_config;
   superpoint_config.model_path =
-      string(getenv("HOME")) + "/source/cnn_models/superpoint_v1_ 480x640.onnx";
+      string(getenv("HOME")) + "/source/cnn_models/superpoint_v1_480x640.onnx";
+  netvlad_config.model_name = "superpoint";
   superpoint_config.device = "GPU";
   superpoint_openvino = new OpenVINOInference(superpoint_config);
 #endif

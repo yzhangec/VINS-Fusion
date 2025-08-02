@@ -116,6 +116,7 @@ else()
     ${OpenCV_LIBS}
     ${CERES_LIBRARIES}
     ${PCL_LIBRARIES}
+    ${TORCH_LIBRARIES}
     faiss
     openvino
     tbb
