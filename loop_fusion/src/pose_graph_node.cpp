@@ -886,10 +886,17 @@ int main(int argc, char **argv) {
 #endif
 
 #ifdef OPENVINO_ENVIRONMENT
-  netvlad_openvino = new OpenVINOInference(string(getenv("HOME")) +
-                                           "/source/cnn_models/mobilenetvlad_480x640.onnx");
-  superpoint_openvino = new OpenVINOInference(string(getenv("HOME")) +
-                                              "/source/cnn_models/superpoint_v1_480x640.onnx");
+  OpenVINOInference::Config netvlad_config;
+  netvlad_config.model_path =
+      string(getenv("HOME")) + "/source/cnn_models/mobilenetvlad_480x640.onnx";
+  netvlad_config.device = "CPU";
+  netvlad_openvino = new OpenVINOInference(netvlad_config);
+
+  OpenVINOInference::Config superpoint_config;
+  superpoint_config.model_path =
+      string(getenv("HOME")) + "/source/cnn_models/superpoint_v1_ 480x640.onnx";
+  superpoint_config.device = "GPU";
+  superpoint_openvino = new OpenVINOInference(superpoint_config);
 #endif
 
   cv::Mat cv_Tbl, cv_Tbr;

@@ -69,6 +69,20 @@ void SuperPointONNX::inference(const cv::Mat &input, std::vector<cv::Point2f> &k
   TicToc tic1;
   auto options = torch::TensorOptions().dtype(torch::kFloat32);
 
+  // // save results_semi_ and results_desc_ to file 
+  // std::ofstream semi_file("/home/eason-wsl/output/results_semi_.txt");
+  // std::ofstream desc_file("/home/eason-wsl/output/results_desc_.txt");
+
+  // for (int i = 0; i < height * width; ++i) {
+  //   semi_file << results_semi_[i] << " ";
+  // }
+  // semi_file.close();
+
+  // for (int i = 0; i < SP_DESC_RAW_LEN * height / 8 * width / 8; ++i) {
+  //   desc_file << results_desc_[i] << " ";
+  // }
+  // desc_file.close();
+
   auto mProb = at::from_blob(results_semi_, {1, 1, height, width}, options);
   auto mDesc = at::from_blob(results_desc_, {1, SP_DESC_RAW_LEN, height / 8, width / 8}, options);
   cv::Mat Prob(height, width, CV_32F, results_semi_);

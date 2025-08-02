@@ -13,13 +13,13 @@ find_package(Ceres REQUIRED)
 find_package(Eigen3)
 find_package(PCL 1.7 REQUIRED)
 find_package(catkin REQUIRED COMPONENTS
-    roscpp
-    std_msgs
-    nav_msgs
-    camera_models
-    cv_bridge
-    roslib
-    message_filters
+  roscpp
+  std_msgs
+  nav_msgs
+  camera_models
+  cv_bridge
+  roslib
+  message_filters
 )
 
 set(Torch_DIR "$ENV{HOME}/source/libtorch/share/cmake/Torch")
@@ -43,65 +43,82 @@ link_directories(${PCL_LIBRARY_DIRS})
 
 if(CUDA_FOUND)
 
-add_definitions(-DCUDA_ENVIRONMENT)
+  add_definitions(-DCUDA_ENVIRONMENT)
 
-add_executable(loop_fusion_node
-  src/pose_graph_node.cpp
-  src/pose_graph.cpp
-  src/keyframe.cpp
-  src/utility/CameraPoseVisualization.cpp
-  src/CNN/superpoint_common.cpp 
-  src/CNN/superpoint_onnx.cpp
-)
+  add_executable(loop_fusion_node
+    src/pose_graph_node.cpp
+    src/pose_graph.cpp
+    src/keyframe.cpp
+    src/utility/CameraPoseVisualization.cpp
+    src/CNN/superpoint_common.cpp
+    src/CNN/superpoint_onnx.cpp
+  )
 
-target_link_libraries(loop_fusion_node 
-  ${catkin_LIBRARIES}  
-  ${OpenCV_LIBS} 
-  ${CERES_LIBRARIES}
-  ${PCL_LIBRARIES}
-  ${TORCH_LIBRARIES} 
-  onnxruntime
-  faiss
-  dw
-) 
+  target_link_libraries(loop_fusion_node
+    ${catkin_LIBRARIES}
+    ${OpenCV_LIBS}
+    ${CERES_LIBRARIES}
+    ${PCL_LIBRARIES}
+    ${TORCH_LIBRARIES}
+    onnxruntime
+    faiss
+    dw
+  )
+
+  add_executable(test_superpoint
+    test/test_superpoint.cpp
+    src/CNN/superpoint_common.cpp
+    src/CNN/superpoint_onnx.cpp
+  )
+
+  target_link_libraries(test_superpoint
+    ${catkin_LIBRARIES}
+    ${OpenCV_LIBS}
+    ${CERES_LIBRARIES}
+    ${PCL_LIBRARIES}
+    ${TORCH_LIBRARIES}
+    onnxruntime
+    faiss
+    dw
+  )
 
 else()
 
-set(OPENVINO_ROOT "/opt/intel/openvino_2023")
-set(OPENVINO_INCLUDE_DIRS "${OPENVINO_ROOT}/runtime/include")
-set(OPENVINO_LIBRARY_DIR "${OPENVINO_ROOT}/runtime/lib/intel64")
+  set(OPENVINO_ROOT "/opt/intel/openvino_2023")
+  set(OPENVINO_INCLUDE_DIRS "${OPENVINO_ROOT}/runtime/include")
+  set(OPENVINO_LIBRARY_DIR "${OPENVINO_ROOT}/runtime/lib/intel64")
 
-if(NOT EXISTS ${OPENVINO_ROOT})
-  message(FATAL_ERROR "OpenVINO root not exits")
-endif()
+  if(NOT EXISTS ${OPENVINO_ROOT})
+    message(FATAL_ERROR "OpenVINO root not exits")
+  endif()
 
-add_definitions(-DOPENVINO_ENVIRONMENT)
+  add_definitions(-DOPENVINO_ENVIRONMENT)
 
-include_directories(
-  ${catkin_INCLUDE_DIRS}
-  ${OpenCV_INCLUDE_DIRS}
-  ${OPENVINO_INCLUDE_DIRS}
-)
+  include_directories(
+    ${catkin_INCLUDE_DIRS}
+    ${OpenCV_INCLUDE_DIRS}
+    ${OPENVINO_INCLUDE_DIRS}
+  )
 
-link_directories(
-  ${OPENVINO_LIBRARY_DIR}
-)
+  link_directories(
+    ${OPENVINO_LIBRARY_DIR}
+  )
 
-add_executable(loop_fusion_node
-  src/pose_graph_node.cpp
-  src/pose_graph.cpp
-  src/keyframe.cpp
-  src/utility/CameraPoseVisualization.cpp
-)
+  add_executable(loop_fusion_node
+    src/pose_graph_node.cpp
+    src/pose_graph.cpp
+    src/keyframe.cpp
+    src/utility/CameraPoseVisualization.cpp
+  )
 
-target_link_libraries(loop_fusion_node 
-  ${catkin_LIBRARIES}  
-  ${OpenCV_LIBS} 
-  ${CERES_LIBRARIES}
-  ${PCL_LIBRARIES}
-  faiss
-  openvino
-  tbb
-  dw
-) 
+  target_link_libraries(loop_fusion_node
+    ${catkin_LIBRARIES}
+    ${OpenCV_LIBS}
+    ${CERES_LIBRARIES}
+    ${PCL_LIBRARIES}
+    faiss
+    openvino
+    tbb
+    dw
+  )
 endif(CUDA_FOUND)
