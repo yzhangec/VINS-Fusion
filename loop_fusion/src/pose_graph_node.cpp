@@ -9,21 +9,20 @@
  * Author: Qin Tong (qintonguav@gmail.com)
  *******************************************************/
 
-#include "keyframe.h"
-#include "parameters.h"
-#include "pose_graph.h"
-#include "utility/CameraPoseVisualization.h"
-#include "utility/tic_toc.h"
-#include <cv_bridge/cv_bridge.h>
-#include <eigen3/Eigen/Dense>
+#include <future>
 #include <iostream>
 #include <mutex>
+#include <queue>
+#include <thread>
+#include <vector>
+
+#include <cv_bridge/cv_bridge.h>
+#include <eigen3/Eigen/Dense>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/opencv.hpp>
 #include <pcl_conversions/pcl_conversions.h>
-#include <queue>
 #include <ros/package.h>
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
@@ -31,8 +30,6 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/image_encodings.h>
 #include <std_msgs/Bool.h>
-#include <thread>
-#include <vector>
 #include <visualization_msgs/Marker.h>
 
 #include <message_filters/subscriber.h>
@@ -42,7 +39,12 @@
 #include <message_filters/time_synchronizer.h>
 
 #include "backward/backward.hpp"
+#include "keyframe.h"
 #include "loop_fusion/StereoImage.h"
+#include "parameters.h"
+#include "pose_graph.h"
+#include "utility/CameraPoseVisualization.h"
+#include "utility/tic_toc.h"
 
 #ifdef CUDA_ENVIRONMENT
 #include "CNN/mobilenetvlad_onnx.h"
@@ -672,11 +674,10 @@ void process() {
         ros::Time inference_start_time = ros::Time::now();
 
 #ifdef CUDA_ENVIRONMENT
-
         if (COL == 848) {
-          global_desc = netvlad_onnx->inference(image0(cv::Range(0, 480), cv::Range(124, 764)));
-          superpoint_onnx->inference(image0(cv::Range(0, 480), cv::Range(124, 764)), point_2d_uv,
-                                     local_desc);
+          cv::Mat image_crop = image0(cv::Range(0, 480), cv::Range(124, 764));
+          global_desc = netvlad_onnx->inference(image_crop);
+          superpoint_onnx->inference(image_crop, point_2d_uv, local_desc);
           for (int i = 0; i < (int)point_2d_uv.size(); i++) {
             point_2d_uv[i].x += 124;
             point_2d_uv[i].y += 0;
@@ -692,16 +693,31 @@ void process() {
 
 #ifdef OPENVINO_ENVIRONMENT
         if (COL == 848) {
-          global_desc = netvlad_openvino->inference(image0(cv::Range(0, 480), cv::Range(124, 764)));
-          superpoint_openvino->inference(image0(cv::Range(0, 480), cv::Range(124, 764)),
-                                         point_2d_uv, local_desc);
+          cv::Mat image_crop = image0(cv::Range(0, 480), cv::Range(124, 764));
+          global_desc = netvlad_openvino->inference(image_crop);
+          superpoint_openvino->inference(image_crop, point_2d_uv, local_desc);
           for (int i = 0; i < (int)point_2d_uv.size(); i++) {
             point_2d_uv[i].x += 124;
             point_2d_uv[i].y += 0;
           }
         } else if (COL == 640) {
+          // global_desc = netvlad_openvino->inference(image0, true);
+          // superpoint_openvino->inference(image0, point_2d_uv, local_desc);
+
+          // Future to hold the SuperPoint inference result
+          std::future<void> superpoint_future;
+
+          // Start SuperPoint inference in a separate thread
+          superpoint_future = std::async(std::launch::async, [&]() {
+            superpoint_openvino->inference(image0, point_2d_uv, local_desc);
+          });
+
+          // Run NetVLAD inference in current thread
           global_desc = netvlad_openvino->inference(image0, true);
-          superpoint_openvino->inference(image0, point_2d_uv, local_desc);
+
+          // Wait for SuperPoint inference to finish
+          superpoint_future.get();
+
         } else {
           ROS_ERROR("image size not supported");
           ROS_BREAK();
