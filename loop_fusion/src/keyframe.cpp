@@ -73,34 +73,12 @@ Keyframe::Keyframe(double _time_stamp, int _index, Vector3d &_vio_T_w_i, Matrix3
 
 bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
   if (use_gt) {
-    // std::cout << "use ground truth pose" << std::endl;
-    // std::cout << "old_kf->R_w_i_gt:" << std::endl;
-    // std::cout << old_kf->R_w_i_gt << std::endl;
-    // std::cout << "old_kf->T_w_i_gt:" << std::endl;
-    // std::cout << old_kf->T_w_i_gt << std::endl;
-    // std::cout << "R_w_i:" << std::endl;
-    // std::cout << R_w_i << std::endl;
-    // std::cout << "T_w_i:" << std::endl;
-    // std::cout << T_w_i << std::endl;
-
     Eigen::Vector3d relative_t = old_kf->R_w_i_gt.transpose() * (T_w_i_gt - old_kf->T_w_i_gt);
     Eigen::Quaterniond relative_q(old_kf->R_w_i_gt.transpose() * R_w_i_gt); 
     double relative_yaw = Utility::normalizeAngle(Utility::R2ypr(R_w_i_gt).x() -
                                                   Utility::R2ypr(old_kf->R_w_i_gt).x());
-    // std::cout << "Utility::R2ypr(R_w_i_gt).x():" << Utility::R2ypr(R_w_i_gt).x() << std::endl;
-    // std::cout << "Utility::R2ypr(old_kf->R_w_i_gt).x():" << Utility::R2ypr(old_kf->R_w_i_gt).x() << std::endl;
-
-    // std::cout << "relative_t:" << std::endl;
-    // std::cout << relative_t << std::endl;
-    // std::cout << "relative_q:" << std::endl;
-    // std::cout << relative_q.coeffs() << std::endl;
-    // std::cout << "relative_yaw:" << std::endl;
-    // std::cout << relative_yaw << std::endl;
-
     // only for t within 1m and yaw within 30 degree
     if (relative_t.norm() > 1 || fabs(relative_yaw) > 30) {
-      // std::cout << "relative_t.norm():" << relative_t.norm() << std::endl;
-      // std::cout << "fabs(relative_yaw):" << fabs(relative_yaw) << std::endl;
       return false;
     }
 
@@ -129,9 +107,8 @@ bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
 		if (DEBUG_IMAGE)    
 	    {
 	        cv::Mat gray_img, loop_match_img;
-	        cv::Mat old_img = old_kf->image;
-	        cv::hconcat(image, old_img, gray_img);
-	        cvtColor(gray_img, loop_match_img, CV_GRAY2RGB);
+	        cv::hconcat(image, old_kf->image, loop_match_img);
+	        // cvtColor(gray_img, loop_match_img, CV_GRAY2RGB);
 	        for(int i = 0; i< (int)point_2d_uv.size(); i++)
 	        {
 	            cv::Point2f cur_pt = point_2d_uv[i];
@@ -147,19 +124,11 @@ bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
 	        path << "/home/tony-ws1/raw_data/loop_image/"
 	                << index << "-"
 	                << old_kf->index << "-" << "0raw_point.jpg";
-	        cv::imwrite( path.str().c_str(), loop_match_img);
+	        // cv::imwrite( path.str().c_str(), loop_match_img);
+          cv::imshow("loop_match_img", loop_match_img);
+          cv::waitKey(1);
 	    }
 #endif
-  // printf("search by des\n");
-  // searchByBRIEFDes(matched_2d_old, matched_2d_old_norm, status, old_kf->brief_descriptors,
-  //                  old_kf->keypoints, old_kf->keypoints_norm);
-  // reduceVector(matched_2d_cur, status);
-  // reduceVector(matched_2d_old, status);
-  // reduceVector(matched_2d_cur_norm, status);
-  // reduceVector(matched_2d_old_norm, status);
-  // reduceVector(matched_3d, status);
-  // reduceVector(matched_id, status);
-  // printf("search by des finish\n");
 
   cv::BFMatcher bfmatcher(cv::NORM_L2, true);
   std::vector<cv::DMatch> _matches;

@@ -225,33 +225,36 @@ Keyframe *PoseGraph::getKeyFrame(int index) {
 }
 
 int PoseGraph::detectLoopML(Keyframe *keyframe, int frame_index) {
-  float distances[1000] = {0};
-  faiss::Index::idx_t labels[1000];
-  faiss_index.search(1, keyframe->global_desc.data(), 100, distances, labels);
+  int faiss_query_num = 100;
+  float distances[faiss_query_num] = {0};
+  faiss::Index::idx_t labels[faiss_query_num];
+  faiss_index.search(1, keyframe->global_desc.data(), faiss_query_num, distances, labels);
   int loop_index = -1;
 
   // std::cout << "distances";
-  // for (int i = 0; i < 100; i++) {
+  // for (int i = 0; i < faiss_query_num; i++) {
   //   std::cout << distances[i] << " ";
   // }
   // std::cout << std::endl;
 
   // std::cout << "labels";
-  // for (int i = 0; i < 100; i++) {
+  // for (int i = 0; i < faiss_query_num; i++) {
   //   std::cout << labels[i] << " ";
   // }
   // std::cout << std::endl;
 
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < faiss_query_num; i++) {
     if (labels[i] < 0) {
       continue;
     }
 
     // Set a distance threshold to avoid too many matches of nearby frames
     double thres = 0.8;
-    if (labels[i] <= faiss_index.ntotal - 100 && distances[i] > thres) {
+    if (labels[i] <= faiss_index.ntotal - faiss_query_num && distances[i] > thres) {
       loop_index = labels[i];
       thres = distances[i];
+      std::cout << "detectLoopML: loop index: " << loop_index << " with distance: " << thres << std::endl;
+      break;
     }
   }
 

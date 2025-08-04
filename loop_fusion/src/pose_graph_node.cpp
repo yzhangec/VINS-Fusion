@@ -61,7 +61,7 @@ namespace backward {
 backward::SignalHandling sh;
 }
 
-#define SKIP_FIRST_CNT 10
+#define SKIP_FIRST_CNT 0
 using namespace std;
 
 // queue<loop_fusion::StereoImagePtr> image_buf;
@@ -723,7 +723,7 @@ void process() {
           ROS_BREAK();
         }
 #endif
-        printf("inference time %f \n", (ros::Time::now() - inference_start_time).toSec());
+        // printf("inference time %f \n", (ros::Time::now() - inference_start_time).toSec());
 
         posegraph.faiss_index.add(1, global_desc.data());
 
