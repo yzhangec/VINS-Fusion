@@ -1,0 +1,10 @@
+<launch>
+  <arg name="enable_loop" default="true" />
+  <arg name="config_file" default="$(find vins)/../config/realsense_d435i_raven/realsense_stereo_imu_config.yaml" />
+
+  <node name="vins_estimator" pkg="vins" type="vins_node" output="screen" args="$(arg config_file)" />
+
+  <group if="$(arg enable_loop)">
+    <node name="loop_fusion" pkg="loop_fusion" type="loop_fusion_node" output="screen" args="$(arg config_file)" />
+  </group>
+</launch>
