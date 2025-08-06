@@ -506,64 +506,11 @@ void extrinsic_callback(const nav_msgs::Odometry::ConstPtr &pose_msg) {
 
 void process() {
   while (true) {
+    TicToc t_process;
+    
     sensor_msgs::Image::ConstPtr image0_msg = NULL, image1_msg = NULL;
     nav_msgs::Odometry::ConstPtr pose_msg = NULL;
     nav_msgs::Odometry::ConstPtr pose_gt_msg = NULL;
-
-    // if (!has_gt_pose) {
-    //   m_buf.lock();
-    //   if (!image_buf.empty() && !pose_buf.empty()) {
-    //     if (image_buf.front()->header.stamp.toSec() > pose_buf.front()->header.stamp.toSec()) {
-    //       pose_buf.pop();
-    //       printf("throw pose at beginning\n");
-    //     } else if (image_buf.back()->header.stamp.toSec() >=
-    //                pose_buf.front()->header.stamp.toSec()) {
-    //       pose_msg = pose_buf.front();
-    //       pose_buf.pop();
-    //       while (!pose_buf.empty())
-    //         pose_buf.pop();
-    //       while (image_buf.front()->header.stamp.toSec() < pose_msg->header.stamp.toSec())
-    //         image_buf.pop();
-    //       image_msg = image_buf.front();
-    //       image_buf.pop();
-    //     }
-    //   }
-    //   m_buf.unlock();
-    // } else {
-    //   m_buf.lock();
-    //   if (!image_buf.empty() && !pose_buf.empty() && !pose_gt_buf.empty()) {
-    //     if (image_buf.front()->header.stamp.toSec() > pose_buf.front()->header.stamp.toSec()) {
-    //       pose_buf.pop();
-    //       printf("throw pose at beginning\n");
-    //     } else if (image_buf.front()->header.stamp.toSec() >
-    //                pose_gt_buf.front()->header.stamp.toSec()) {
-    //       pose_gt_buf.pop();
-    //       printf("throw pose_gt at beginning\n");
-    //     } else if (pose_buf.front()->header.stamp.toSec() >
-    //                pose_gt_buf.front()->header.stamp.toSec()) {
-    //       pose_gt_buf.pop();
-    //       printf("throw pose_gt at beginning\n");
-    //     } else if (image_buf.back()->header.stamp.toSec() >=
-    //                    pose_buf.front()->header.stamp.toSec() &&
-    //                image_buf.back()->header.stamp.toSec() >=
-    //                    pose_gt_buf.front()->header.stamp.toSec()) {
-    //       pose_msg = pose_buf.front();
-    //       pose_buf.pop();
-    //       pose_gt_msg = pose_gt_buf.front();
-    //       pose_gt_buf.pop();
-    //       while (!pose_buf.empty())
-    //         pose_buf.pop();
-    //       while (!pose_gt_buf.empty())
-    //         pose_gt_buf.pop();
-    //       while (image_buf.front()->header.stamp.toSec() < pose_msg->header.stamp.toSec())
-    //         image_buf.pop();
-    //       image_msg = image_buf.front();
-    //       image_buf.pop();
-    //     }
-    //   }
-
-    //   m_buf.unlock();
-    // }
 
     m_buf.lock();
     // remove old tuples if tuple size is too large
@@ -601,6 +548,7 @@ void process() {
     }
     m_buf.unlock();
 
+    
     if (pose_msg != NULL) {
       // printf("pose time %f \n", pose_msg->header.stamp.toSec());
       // if (has_gt_pose)
@@ -620,34 +568,6 @@ void process() {
       } else {
         skip_cnt = 0;
       }
-
-      // cv_bridge::CvImageConstPtr ptr0, ptr1;
-      // image0_msg = image_msg->image0;
-      // image1_msg = image_msg->image1;
-      // if (image0_msg.encoding == "8UC1") {
-      //   sensor_msgs::Image img0, img1;
-      //   img0.header = image0_msg.header;
-      //   img0.height = image0_msg.height;
-      //   img0.width = image0_msg.width;
-      //   img0.is_bigendian = image0_msg.is_bigendian;
-      //   img0.step = image0_msg.step;
-      //   img0.data = image0_msg.data;
-      //   img0.encoding = "mono8";
-
-      //   img1.header = image1_msg.header;
-      //   img1.height = image1_msg.height;
-      //   img1.width = image1_msg.width;
-      //   img1.is_bigendian = image1_msg.is_bigendian;
-      //   img1.step = image1_msg.step;
-      //   img1.data = image1_msg.data;
-      //   img1.encoding = "mono8";
-
-      //   ptr0 = cv_bridge::toCvCopy(img0, sensor_msgs::image_encodings::MONO8);
-      //   ptr1 = cv_bridge::toCvCopy(img1, sensor_msgs::image_encodings::MONO8);
-      // } else {
-      //   ptr0 = cv_bridge::toCvCopy(image0_msg, sensor_msgs::image_encodings::MONO8);
-      //   ptr1 = cv_bridge::toCvCopy(image1_msg, sensor_msgs::image_encodings::MONO8);
-      // }
 
       cv_bridge::CvImageConstPtr ptr0, ptr1;
       ptr0 = cv_bridge::toCvCopy(*image0_msg, sensor_msgs::image_encodings::MONO8);
@@ -672,6 +592,7 @@ void process() {
         std::vector<float> local_desc;
 
         ros::Time inference_start_time = ros::Time::now();
+
 
 #ifdef CUDA_ENVIRONMENT
         if (COL == 848) {
@@ -828,8 +749,14 @@ void process() {
         last_t = T;
       }
     }
-    std::chrono::milliseconds dura(5);
-    std::this_thread::sleep_for(dura);
+
+    // process time
+    double process_time = t_process.toc();
+    // printf("loop process time %f \n", process_time);
+    if (process_time < 5.0) {
+      std::chrono::milliseconds dura((int)(5.0 - process_time));
+      std::this_thread::sleep_for(dura);
+    }
   }
 }
 

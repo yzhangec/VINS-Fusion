@@ -117,7 +117,7 @@ void PoseGraph::addKeyFrame(Keyframe *cur_kf, bool use_gt) {
         vio_P_cur = w_r_vio * vio_P_cur + w_t_vio;
         vio_R_cur = w_r_vio * vio_R_cur;
         cur_kf->updateVioPose(vio_P_cur, vio_R_cur);
-        list<Keyframe *>::iterator it = keyframelist.begin();
+        vector<Keyframe *>::iterator it = keyframelist.begin();
         for (; it != keyframelist.end(); it++) {
           if ((*it)->sequence == cur_kf->sequence) {
             Vector3d vio_P_cur;
@@ -174,7 +174,7 @@ void PoseGraph::addKeyFrame(Keyframe *cur_kf, bool use_gt) {
   }
   // draw local connection
   if (SHOW_S_EDGE) {
-    list<Keyframe *>::reverse_iterator rit = keyframelist.rbegin();
+    vector<Keyframe *>::reverse_iterator rit = keyframelist.rbegin();
     for (int i = 0; i < 4; i++) {
       if (rit == keyframelist.rend())
         break;
@@ -213,15 +213,22 @@ void PoseGraph::addKeyFrame(Keyframe *cur_kf, bool use_gt) {
 
 Keyframe *PoseGraph::getKeyFrame(int index) {
   //    unique_lock<mutex> lock(m_keyframelist);
-  list<Keyframe *>::iterator it = keyframelist.begin();
-  for (; it != keyframelist.end(); it++) {
-    if ((*it)->index == index)
-      break;
+  // list<Keyframe *>::iterator it = keyframelist.begin();
+  // for (; it != keyframelist.end(); it++) {
+  //   if ((*it)->index == index)
+  //     break;
+  // }
+  // if (it != keyframelist.end())
+  //   return *it;
+  // else
+  //   return NULL;
+
+  if (index < 0 || index >= (int)keyframelist.size()) {
+    std::cerr << "Keyframe index out of bounds: " << index << std::endl;
+    return nullptr;
   }
-  if (it != keyframelist.end())
-    return *it;
-  else
-    return NULL;
+
+  return keyframelist[index];
 }
 
 int PoseGraph::detectLoopML(Keyframe *keyframe, int frame_index) {
@@ -249,11 +256,11 @@ int PoseGraph::detectLoopML(Keyframe *keyframe, int frame_index) {
     }
 
     // Set a distance threshold to avoid too many matches of nearby frames
+    int nearby_frames_cutoff = 100;
     double thres = 0.8;
-    if (labels[i] <= faiss_index.ntotal - faiss_query_num && distances[i] > thres) {
+    if (labels[i] <= faiss_index.ntotal - nearby_frames_cutoff && distances[i] > thres) {
       loop_index = labels[i];
       thres = distances[i];
-      std::cout << "detectLoopML: loop index: " << loop_index << " with distance: " << thres << std::endl;
       break;
     }
   }
@@ -276,7 +283,7 @@ void PoseGraph::optimize4DoF() {
     m_optimize_buf.unlock();
 
     if (cur_index != -1) {
-      printf("optimize pose graph \n");
+      // printf("optimize pose graph \n");
       TicToc tmp_t;
       m_keyframelist.lock();
       Keyframe *cur_kf = getKeyFrame(cur_index);
@@ -302,7 +309,7 @@ void PoseGraph::optimize4DoF() {
       ceres::LocalParameterization *angle_local_parameterization =
           AngleLocalParameterization::Create();
 
-      list<Keyframe *>::iterator it;
+      vector<Keyframe *>::iterator it;
 
       int i = 0;
       for (it = keyframelist.begin(); it != keyframelist.end(); it++) {
@@ -414,6 +421,7 @@ void PoseGraph::optimize4DoF() {
       // cout << "r_drift " << Utility::R2ypr(r_drift).transpose() << endl;
       // cout << "yaw drift " << yaw_drift << endl;
 
+      // rectify the pose after current keyframe
       it++;
       for (; it != keyframelist.end(); it++) {
         Vector3d P;
@@ -435,7 +443,7 @@ void PoseGraph::optimize4DoF() {
 
 void PoseGraph::updatePath() {
   m_keyframelist.lock();
-  list<Keyframe *>::iterator it;
+  vector<Keyframe *>::iterator it;
   for (int i = 1; i <= sequence_cnt; i++) {
     path[i].poses.clear();
   }
@@ -485,8 +493,8 @@ void PoseGraph::updatePath() {
     }
     // draw local connection
     if (SHOW_S_EDGE) {
-      list<Keyframe *>::reverse_iterator rit = keyframelist.rbegin();
-      list<Keyframe *>::reverse_iterator lrit;
+      vector<Keyframe *>::reverse_iterator rit = keyframelist.rbegin();
+      vector<Keyframe *>::reverse_iterator lrit;
       for (; rit != keyframelist.rend(); rit++) {
         if ((*rit)->index == (*it)->index) {
           lrit = rit;
@@ -522,7 +530,7 @@ void PoseGraph::updatePath() {
     }
   }
   publish();
-  pub_opt.publish(path[1]);
+  // pub_opt.publish(path[1]);
   m_keyframelist.unlock();
 }
 
