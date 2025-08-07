@@ -314,12 +314,12 @@ void publishLandmarks(const std::vector<cv::Point3f> &landmarks) {
 void image_pose_callback(const sensor_msgs::ImageConstPtr &image0_msg,
                          const sensor_msgs::ImageConstPtr &image1_msg,
                          const nav_msgs::Odometry::ConstPtr &pose_msg) {
-  static int skip = 0;
-  if (skip % 2 == 1) {
-    skip++;
-    return;
-  }
-  skip++;
+  // static int skip = 0;
+  // if (skip % 2 == 1) {
+  //   skip++;
+  //   return;
+  // }
+  // skip++;
 
   m_buf.lock();
   // std::cout << "image_pose_callback" << std::endl;
@@ -327,6 +327,7 @@ void image_pose_callback(const sensor_msgs::ImageConstPtr &image0_msg,
   // std::cout << "image1_msg ts:" << image1_msg->header.stamp << std::endl;
   // std::cout << "pose_msg ts:" << pose_msg->header.stamp << std::endl;
   image_pose_buf.push(std::make_tuple(image0_msg, image1_msg, pose_msg));
+  printf("image_pose_callback image_pose_buf.size() = %d\n", (int)image_pose_buf.size());
   m_buf.unlock();
 }
 
@@ -334,6 +335,13 @@ void image_pose_gt_callback(const sensor_msgs::ImageConstPtr &image0_msg,
                             const sensor_msgs::ImageConstPtr &image1_msg,
                             const nav_msgs::Odometry::ConstPtr &pose_msg,
                             const nav_msgs::Odometry::ConstPtr &pose_gt_msg) {
+  // static int skip = 0;
+  // if (skip % 4 != 0) {
+  //   skip++;
+  //   return;
+  // }
+  // skip++;
+
   m_buf.lock();
   // std::cout << "image_pose_gt_callback" << std::endl;
   // std::cout << "image0_msg ts:" << image0_msg->header.stamp << std::endl;
@@ -341,6 +349,7 @@ void image_pose_gt_callback(const sensor_msgs::ImageConstPtr &image0_msg,
   // std::cout << "pose_msg ts:" << pose_msg->header.stamp << std::endl;
   // std::cout << "pose_gt_msg ts:" << pose_gt_msg->header.stamp << std::endl;
   image_pose_gt_buf.push(std::make_tuple(image0_msg, image1_msg, pose_msg, pose_gt_msg));
+  // printf("image_pose_gt_callback image_pose_gt_buf.size() = %d\n", (int)image_pose_gt_buf.size());
   m_buf.unlock();
 }
 
@@ -507,23 +516,27 @@ void extrinsic_callback(const nav_msgs::Odometry::ConstPtr &pose_msg) {
 void process() {
   while (true) {
     TicToc t_process;
-    
+
     sensor_msgs::Image::ConstPtr image0_msg = NULL, image1_msg = NULL;
     nav_msgs::Odometry::ConstPtr pose_msg = NULL;
     nav_msgs::Odometry::ConstPtr pose_gt_msg = NULL;
 
     m_buf.lock();
-    // remove old tuples if tuple size is too large
-    int throw_cnt = 0;
-    while (image_pose_buf.size() > 2) {
-      image_pose_buf.pop();
-      throw_cnt++;
-    }
-    if (throw_cnt > 0) {
-      printf("throw %d image_pose_buf tuples\n", throw_cnt);
-    }
 
     if (!has_gt_pose) {
+      // remove old tuples if tuple size is too large
+      int throw_cnt = 0;
+      while (image_pose_buf.size() > 1) {
+        image_pose_buf.pop();
+        throw_cnt++;
+      }
+      if (throw_cnt > 0) {
+        printf("throw %d image_pose_buf tuples\n", throw_cnt);
+      }
+
+      // print image_pose_buf.size()
+      // printf("process image_pose_buf.size() = %d\n", (int)image_pose_buf.size());
+
       // get msg from tuple
       if (!image_pose_buf.empty()) {
         std::tuple<sensor_msgs::ImageConstPtr, sensor_msgs::ImageConstPtr,
@@ -535,6 +548,19 @@ void process() {
         pose_msg = std::get<2>(tuple);
       }
     } else {
+      // remove old tuples if tuple size is too large
+      int throw_cnt = 0;
+      while (image_pose_gt_buf.size() > 1) {
+        image_pose_gt_buf.pop();
+        throw_cnt++;
+      }
+      if (throw_cnt > 0) {
+        printf("throw %d image_pose_gt_buf tuples\n", throw_cnt);
+      }
+
+      // print image_pose_gt_buf.size()
+      // printf("process image_pose_gt_buf.size() = %d\n", (int)image_pose_gt_buf.size());
+
       if (!image_pose_gt_buf.empty()) {
         std::tuple<sensor_msgs::ImageConstPtr, sensor_msgs::ImageConstPtr,
                    nav_msgs::Odometry::ConstPtr, nav_msgs::Odometry::ConstPtr>
@@ -548,7 +574,6 @@ void process() {
     }
     m_buf.unlock();
 
-    
     if (pose_msg != NULL) {
       // printf("pose time %f \n", pose_msg->header.stamp.toSec());
       // if (has_gt_pose)
@@ -592,7 +617,6 @@ void process() {
         std::vector<float> local_desc;
 
         ros::Time inference_start_time = ros::Time::now();
-
 
 #ifdef CUDA_ENVIRONMENT
         if (COL == 848) {
@@ -885,10 +909,10 @@ int main(int argc, char **argv) {
   message_filters::Synchronizer<ImageOdometryGTSyncPolicy> stereo_pose_gt_sync_(
       ImageOdometryGTSyncPolicy(100), image0_sub_, image1_sub_, pose_sub_, pose_gt_sub_);
 
-  image0_sub_.subscribe(n, IMAGE0_TOPIC, 100);
-  image1_sub_.subscribe(n, IMAGE1_TOPIC, 100);
-  pose_sub_.subscribe(n, "/vins_estimator/keyframe_pose", 100);
-  pose_gt_sub_.subscribe(n, "/uav_simulator/odometry", 100);
+  image0_sub_.subscribe(n, IMAGE0_TOPIC, 1);
+  image1_sub_.subscribe(n, IMAGE1_TOPIC, 1);
+  pose_sub_.subscribe(n, "/vins_estimator/keyframe_pose", 1);
+  pose_gt_sub_.subscribe(n, "/uav_simulator/odometry", 1);
 
   // stereo_sync_.registerCallback(boost::bind(&image_callback, _1, _2));
   if (!has_gt_pose)
