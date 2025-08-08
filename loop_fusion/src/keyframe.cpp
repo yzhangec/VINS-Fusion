@@ -74,7 +74,7 @@ Keyframe::Keyframe(double _time_stamp, int _index, Vector3d &_vio_T_w_i, Matrix3
 bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
   if (use_gt) {
     Eigen::Vector3d relative_t = old_kf->R_w_i_gt.transpose() * (T_w_i_gt - old_kf->T_w_i_gt);
-    Eigen::Quaterniond relative_q(old_kf->R_w_i_gt.transpose() * R_w_i_gt); 
+    Eigen::Quaterniond relative_q(old_kf->R_w_i_gt.transpose() * R_w_i_gt);
     double relative_yaw = Utility::normalizeAngle(Utility::R2ypr(R_w_i_gt).x() -
                                                   Utility::R2ypr(old_kf->R_w_i_gt).x());
     // only for t within 1m and yaw within 30 degree
@@ -104,30 +104,26 @@ bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
 
   TicToc t_match;
 #if 0
-		if (DEBUG_IMAGE)    
-	    {
-	        cv::Mat gray_img, loop_match_img;
-	        cv::hconcat(image, old_kf->image, loop_match_img);
-	        // cvtColor(gray_img, loop_match_img, CV_GRAY2RGB);
-	        for(int i = 0; i< (int)point_2d_uv.size(); i++)
-	        {
-	            cv::Point2f cur_pt = point_2d_uv[i];
-	            cv::circle(loop_match_img, cur_pt, 5, cv::Scalar(0, 255, 0));
-	        }
-	        for(int i = 0; i< (int)old_kf->keypoints.size(); i++)
-	        {
-	            cv::Point2f old_pt = old_kf->keypoints[i].pt;
-	            old_pt.x += COL;
-	            cv::circle(loop_match_img, old_pt, 5, cv::Scalar(0, 255, 0));
-	        }
-	        ostringstream path;
-	        path << "/home/tony-ws1/raw_data/loop_image/"
-	                << index << "-"
-	                << old_kf->index << "-" << "0raw_point.jpg";
-	        // cv::imwrite( path.str().c_str(), loop_match_img);
-          cv::imshow("loop_match_img", loop_match_img);
-          cv::waitKey(1);
-	    }
+  if (DEBUG_IMAGE) {
+    cv::Mat gray_img, loop_match_img;
+    cv::hconcat(image, old_kf->image, loop_match_img);
+    // cvtColor(gray_img, loop_match_img, CV_GRAY2RGB);
+    for (int i = 0; i < (int)point_2d_uv.size(); i++) {
+      cv::Point2f cur_pt = point_2d_uv[i];
+      cv::circle(loop_match_img, cur_pt, 5, cv::Scalar(0, 255, 0));
+    }
+    for (int i = 0; i < (int)old_kf->keypoints.size(); i++) {
+      cv::Point2f old_pt = old_kf->keypoints[i].pt;
+      old_pt.x += COL;
+      cv::circle(loop_match_img, old_pt, 5, cv::Scalar(0, 255, 0));
+    }
+    ostringstream path;
+    path << "/home/tony-ws1/raw_data/loop_image/" << index << "-" << old_kf->index << "-"
+         << "0raw_point.jpg";
+    // cv::imwrite( path.str().c_str(), loop_match_img);
+    cv::imshow("loop_match_img", loop_match_img);
+    cv::waitKey(1);
+  }
 #endif
 
   cv::BFMatcher bfmatcher(cv::NORM_L2, true);
@@ -323,21 +319,33 @@ bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
 
   // if ((int)matched_2d_cur.size() > MIN_LOOP_NUM) {
   if (pnp_success) {
+
+#if 1
     if (DEBUG_IMAGE) {
-      cv::Mat show_img0, show_img1, show_loop_img;
-      cv::cvtColor(image, show_img0, cv::COLOR_GRAY2RGB);
-      cv::cvtColor(old_kf->image, show_img1, cv::COLOR_GRAY2RGB);
-      drawFeatureOnImage(show_img0, point_2d_uv);
-      drawFeatureOnImage(show_img1, old_kf->point_2d_uv);
-      cv::hconcat(show_img0, show_img1, show_loop_img);
-      drawLineOnImage(show_loop_img, pts0, pts1);
+      cv::Mat show_loop_img;
+      cv::hconcat(image, old_kf->image, show_loop_img);
+      for (int i = 0; i < (int)point_2d_uv.size(); i++) {
+        cv::Point2f cur_pt = point_2d_uv[i];
+        cv::circle(show_loop_img, cur_pt, 3, cv::Scalar(255), 3);
+      }
+      for (int i = 0; i < (int)old_kf->point_2d_uv.size(); i++) {
+        cv::Point2f old_pt = old_kf->point_2d_uv[i];
+        old_pt.x += COL;
+        cv::circle(show_loop_img, old_pt, 3, cv::Scalar(255), 3);
+      }
+      drawLineOnImage(show_loop_img, pts0, pts1, cv::Scalar(128));
       static int loop_cnt = 0;
-      cv::imshow("loop frame", show_loop_img);
-      cv::imwrite("/home/eason/output/active_loop_debug/tmp_loop_pair/" + to_string(index) + "-" +
-                      to_string(old_kf->index) + "-" + to_string(loop_cnt) + ".png",
+      string output_dir = string(getenv("HOME")) + "/output/loop_pair/";
+      if (!std::filesystem::exists(output_dir)) {
+        std::filesystem::create_directories(output_dir);
+      }
+      cv::imwrite(output_dir + to_string(index) + "-" + to_string(old_kf->index) + "-" +
+                      to_string(loop_cnt) + ".png",
                   show_loop_img);
+      cv::imshow("loop frame", show_loop_img);
       cv::waitKey(1);
     }
+#endif
 
     // PnP_R_old: R_w_old, PnP_T_old: T_w_old
     relative_t = PnP_R_old.transpose() * (origin_vio_T - PnP_T_old);

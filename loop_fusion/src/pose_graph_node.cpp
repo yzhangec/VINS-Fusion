@@ -314,20 +314,8 @@ void publishLandmarks(const std::vector<cv::Point3f> &landmarks) {
 void image_pose_callback(const sensor_msgs::ImageConstPtr &image0_msg,
                          const sensor_msgs::ImageConstPtr &image1_msg,
                          const nav_msgs::Odometry::ConstPtr &pose_msg) {
-  // static int skip = 0;
-  // if (skip % 2 == 1) {
-  //   skip++;
-  //   return;
-  // }
-  // skip++;
-
   m_buf.lock();
-  // std::cout << "image_pose_callback" << std::endl;
-  // std::cout << "image0_msg ts:" << image0_msg->header.stamp << std::endl;
-  // std::cout << "image1_msg ts:" << image1_msg->header.stamp << std::endl;
-  // std::cout << "pose_msg ts:" << pose_msg->header.stamp << std::endl;
   image_pose_buf.push(std::make_tuple(image0_msg, image1_msg, pose_msg));
-  printf("image_pose_callback image_pose_buf.size() = %d\n", (int)image_pose_buf.size());
   m_buf.unlock();
 }
 
@@ -335,21 +323,8 @@ void image_pose_gt_callback(const sensor_msgs::ImageConstPtr &image0_msg,
                             const sensor_msgs::ImageConstPtr &image1_msg,
                             const nav_msgs::Odometry::ConstPtr &pose_msg,
                             const nav_msgs::Odometry::ConstPtr &pose_gt_msg) {
-  // static int skip = 0;
-  // if (skip % 4 != 0) {
-  //   skip++;
-  //   return;
-  // }
-  // skip++;
-
   m_buf.lock();
-  // std::cout << "image_pose_gt_callback" << std::endl;
-  // std::cout << "image0_msg ts:" << image0_msg->header.stamp << std::endl;
-  // std::cout << "image1_msg ts:" << image1_msg->header.stamp << std::endl;
-  // std::cout << "pose_msg ts:" << pose_msg->header.stamp << std::endl;
-  // std::cout << "pose_gt_msg ts:" << pose_gt_msg->header.stamp << std::endl;
   image_pose_gt_buf.push(std::make_tuple(image0_msg, image1_msg, pose_msg, pose_gt_msg));
-  // printf("image_pose_gt_callback image_pose_gt_buf.size() = %d\n", (int)image_pose_gt_buf.size());
   m_buf.unlock();
 }
 
@@ -523,6 +498,7 @@ void process() {
 
     m_buf.lock();
 
+#if 0
     if (!has_gt_pose) {
       // remove old tuples if tuple size is too large
       int throw_cnt = 0;
@@ -530,9 +506,9 @@ void process() {
         image_pose_buf.pop();
         throw_cnt++;
       }
-      if (throw_cnt > 0) {
-        printf("throw %d image_pose_buf tuples\n", throw_cnt);
-      }
+      // if (throw_cnt > 0) {
+      //   printf("throw %d image_pose_buf tuples\n", throw_cnt);
+      // }
 
       // print image_pose_buf.size()
       // printf("process image_pose_buf.size() = %d\n", (int)image_pose_buf.size());
@@ -554,9 +530,9 @@ void process() {
         image_pose_gt_buf.pop();
         throw_cnt++;
       }
-      if (throw_cnt > 0) {
-        printf("throw %d image_pose_gt_buf tuples\n", throw_cnt);
-      }
+      // if (throw_cnt > 0) {
+      //   printf("throw %d image_pose_gt_buf tuples\n", throw_cnt);
+      // }
 
       // print image_pose_gt_buf.size()
       // printf("process image_pose_gt_buf.size() = %d\n", (int)image_pose_gt_buf.size());
@@ -572,6 +548,35 @@ void process() {
         pose_gt_msg = std::get<3>(tuple);
       }
     }
+#endif
+
+    auto process_buffer = [](auto &buffer, auto &... messages) {
+      // Remove old tuples if tuple size is too large
+      int throw_cnt = 0;
+      while (buffer.size() > 1) {
+        buffer.pop();
+        throw_cnt++;
+      }
+
+      // Get msg from tuple if not empty
+      if (!buffer.empty()) {
+        auto tuple = buffer.front();
+        buffer.pop();
+        std::tie(messages...) = tuple;
+      }
+      return throw_cnt;
+    };
+
+    // Then in your original code:
+    if (!has_gt_pose) {
+      int throw_cnt = process_buffer(image_pose_buf, image0_msg, image1_msg, pose_msg);
+      // if (throw_cnt > 0) { printf("throw %d tuples\n", throw_cnt); }
+    } else {
+      int throw_cnt =
+          process_buffer(image_pose_gt_buf, image0_msg, image1_msg, pose_msg, pose_gt_msg);
+      // if (throw_cnt > 0) { printf("throw %d tuples\n", throw_cnt); }
+    }
+
     m_buf.unlock();
 
     if (pose_msg != NULL) {
@@ -668,7 +673,7 @@ void process() {
           ROS_BREAK();
         }
 #endif
-        // printf("inference time %f \n", (ros::Time::now() - inference_start_time).toSec());
+        printf("inference time %f \n", (ros::Time::now() - inference_start_time).toSec());
 
         posegraph.faiss_index.add(1, global_desc.data());
 
