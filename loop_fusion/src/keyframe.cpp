@@ -163,39 +163,39 @@ bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
   reduceVector(pts1, mask);
   reduceVector(pts1_norm, mask);
 
-  // checkSize(pts0, NAME(pts0));
-  // checkSize(pts0_3d, NAME(pts0_3d));
-  // checkSize(pts1, NAME(pts1));
-  // checkSize(pts1_norm, NAME(pts1_norm));
+  checkSize(pts0, NAME(pts0));
+  checkSize(pts0_3d, NAME(pts0_3d));
+  checkSize(pts1, NAME(pts1));
+  checkSize(pts1_norm, NAME(pts1_norm));
 
 #if 0
   if (DEBUG_IMAGE) {
-    int gap = 10;
-    cv::Mat gap_image(ROW, gap, CV_8UC1, cv::Scalar(255, 255, 255));
-    cv::Mat gray_img, loop_match_img;
-    cv::Mat old_img = old_kf->image;
-    cv::hconcat(image, gap_image, gap_image);
-    cv::hconcat(gap_image, old_img, gray_img);
-    cvtColor(gray_img, loop_match_img, CV_GRAY2RGB);
-    for (int i = 0; i < (int)matched_2d_cur.size(); i++) {
-      cv::Point2f cur_pt = matched_2d_cur[i];
-      cv::circle(loop_match_img, cur_pt, 5, cv::Scalar(0, 255, 0));
-    }
-    for (int i = 0; i < (int)matched_2d_old.size(); i++) {
-      cv::Point2f old_pt = matched_2d_old[i];
-      old_pt.x += (COL + gap);
-      cv::circle(loop_match_img, old_pt, 5, cv::Scalar(0, 255, 0));
-    }
-    for (int i = 0; i < (int)matched_2d_cur.size(); i++) {
-      cv::Point2f old_pt = matched_2d_old[i];
-      old_pt.x += (COL + gap);
-      cv::line(loop_match_img, matched_2d_cur[i], old_pt, cv::Scalar(0, 255, 0), 1, 8, 0);
-    }
+    // int gap = 10;
+    // cv::Mat gap_image(ROW, gap, CV_8UC1, cv::Scalar(255, 255, 255));
+    // cv::Mat gray_img, loop_match_img;
+    // cv::Mat old_img = old_kf->image;
+    // cv::hconcat(image, gap_image, gap_image);
+    // cv::hconcat(gap_image, old_img, gray_img);
+    // cvtColor(gray_img, loop_match_img, CV_GRAY2RGB);
+    // for (int i = 0; i < (int)matched_2d_cur.size(); i++) {
+    //   cv::Point2f cur_pt = matched_2d_cur[i];
+    //   cv::circle(loop_match_img, cur_pt, 5, cv::Scalar(0, 255, 0));
+    // }
+    // for (int i = 0; i < (int)matched_2d_old.size(); i++) {
+    //   cv::Point2f old_pt = matched_2d_old[i];
+    //   old_pt.x += (COL + gap);
+    //   cv::circle(loop_match_img, old_pt, 5, cv::Scalar(0, 255, 0));
+    // }
+    // for (int i = 0; i < (int)matched_2d_cur.size(); i++) {
+    //   cv::Point2f old_pt = matched_2d_old[i];
+    //   old_pt.x += (COL + gap);
+    //   cv::line(loop_match_img, matched_2d_cur[i], old_pt, cv::Scalar(0, 255, 0), 1, 8, 0);
+    // }
 
-    ostringstream path, path1, path2;
-    path << "/home/tony-ws1/raw_data/loop_image/" << index << "-" << old_kf->index << "-"
-         << "1descriptor_match.jpg";
-    cv::imwrite(path.str().c_str(), loop_match_img);
+    // ostringstream path, path1, path2;
+    // path << "/home/tony-ws1/raw_data/loop_image/" << index << "-" << old_kf->index << "-"
+    //      << "1descriptor_match.jpg";
+    // cv::imwrite(path.str().c_str(), loop_match_img);
     /*
     path1 <<  "/home/tony-ws1/raw_data/loop_image/"
             << index << "-"
@@ -206,6 +206,38 @@ bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
             << old_kf->index << "-" << "1descriptor_match_2.jpg";
     cv::imwrite( path2.str().c_str(), old_img);
     */
+
+    cv::Mat gray_img, loop_match_img;
+    cv::hconcat(image, old_kf->image, loop_match_img);
+    // cvtColor(gray_img, loop_match_img, CV_GRAY2RGB);
+    // for (int i = 0; i < (int)point_2d_uv.size(); i++) {
+    //   cv::Point2f cur_pt = point_2d_uv[i];
+    //   cv::circle(loop_match_img, cur_pt, 5, cv::Scalar(0, 255, 0));
+    // }
+    // for (int i = 0; i < (int)old_kf->keypoints.size(); i++) {
+    //   cv::Point2f old_pt = old_kf->keypoints[i].pt;
+    //   old_pt.x += COL;
+    //   cv::circle(loop_match_img, old_pt, 5, cv::Scalar(0, 255, 0));
+    // }
+
+    for (int i = 0; i < (int)point_2d_uv.size(); i++) {
+      cv::Point2f cur_pt = point_2d_uv[i];
+      cv::circle(loop_match_img, cur_pt, 5, cv::Scalar(255));
+    }
+    for (int i = 0; i < (int)old_kf->keypoints.size(); i++) {
+      cv::Point2f old_pt = old_kf->keypoints[i];
+      old_pt.x += COL;
+      cv::circle(loop_match_img, old_pt, 5, cv::Scalar(255));
+    }
+    for (int i = 0; i < (int)matched_2d_cur.size(); i++) {
+      cv::Point2f old_pt = matched_2d_old[i];
+      old_pt.x += COL;
+      cv::line(loop_match_img, matched_2d_cur[i], old_pt, cv::Scalar(255), 1, 8, 0);
+    }
+
+
+    cv::imshow("loop_match_img", loop_match_img);
+    cv::waitKey(1);
   }
 #endif
   status.clear();

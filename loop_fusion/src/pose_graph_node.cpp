@@ -215,7 +215,7 @@ void generate3dPoints(const std::vector<cv::Point2f> &left_pts,
     Vector3d pt3;
     triangulatePoint(P1, P2, pl, pr, pt3);
 
-    if (pt3[2] > 0 && pt3[2] < 5) {
+    if (pt3[2] > 0 && pt3[2] < 8.0) {
       cur_pts_3d.push_back(cv::Point3f(pt3[0], pt3[1], pt3[2]));
       status.push_back(1);
     } else {
@@ -644,11 +644,21 @@ void process() {
 #ifdef OPENVINO_ENVIRONMENT
         if (COL == 848) {
           cv::Mat image_crop = image0(cv::Range(0, 480), cv::Range(124, 764));
+
           global_desc = netvlad_openvino->inference(image_crop);
           superpoint_openvino->inference(image_crop, point_2d_uv, local_desc);
+
           for (int i = 0; i < (int)point_2d_uv.size(); i++) {
             point_2d_uv[i].x += 124;
             point_2d_uv[i].y += 0;
+          }
+
+          // imshow with superpoint features
+          if (0) {
+            cv::Mat show_img = image0.clone();
+            drawFeatureOnImage(show_img, point_2d_uv, cv::Scalar(255, 255, 255));
+            cv::imshow("superpoint features", show_img);
+            cv::waitKey(1);
           }
         } else if (COL == 640) {
           // global_desc = netvlad_openvino->inference(image0, true);
@@ -667,7 +677,6 @@ void process() {
 
           // Wait for SuperPoint inference to finish
           superpoint_future.get();
-
         } else {
           ROS_ERROR("image size not supported");
           ROS_BREAK();
@@ -704,6 +713,10 @@ void process() {
         reduceVector(point_2d_uv, status);
         reduceVector(landmarks_2d_cam1, status);
         reduceDescriptorVector(local_desc, status);
+
+        std::cout << "point_2d_uv size: " << point_2d_uv.size()
+                  << ", landmarks_2d_cam1 size: " << landmarks_2d_cam1.size() << std::endl;
+
         undistortedPts(point_2d_uv, point_2d_normal, stereo_camera_[0]);
         undistortedPts(landmarks_2d_cam1, un_pts1, stereo_camera_[1]);
         generate3dPoints(point_2d_normal, un_pts1, point_3d, status);
@@ -711,6 +724,11 @@ void process() {
         reduceVector(point_2d_normal, status);
         reduceVector(landmarks_2d_cam1, status);
         reduceDescriptorVector(local_desc, status);
+
+        std::cout << "point_3d size: " << point_3d.size()
+                  << ", point_2d_uv size: " << point_2d_uv.size()
+                  << ", point_2d_normal size: " << point_2d_normal.size()
+                  << ", landmarks_2d_cam1 size: " << landmarks_2d_cam1.size() << std::endl;
 
         for (size_t i = 0; i < point_3d.size(); i++) {
           Eigen::Vector3d pt_c, pt_i, pt_w;
@@ -743,7 +761,7 @@ void process() {
         //   // printf("u %f, v %f \n", p_2d_uv.x, p_2d_uv.y);
         // }
 
-        if (0) {
+        if (1) {
           cv::Mat show_img0, show_img1, show_img;
           show_img0 = image0.clone();
           show_img1 = image1.clone();

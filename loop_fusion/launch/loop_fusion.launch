@@ -14,7 +14,7 @@
   </group>
 
   <group if="$(arg enable_bag)">
-    <arg name="bag_file" default="$(env HOME)/bag/map.bag" />
+    <arg name="bag_file" default="$(env HOME)/bag/fif_2025-08-09-21-57-08.bag" />
     <node pkg="rosbag" type="play" name="player" output="log" args="--clock --delay 1 -s 0 $(arg bag_file)"/>
   </group>
 </launch>
