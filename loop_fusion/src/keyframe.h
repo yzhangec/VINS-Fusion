@@ -11,16 +11,19 @@
 
 #pragma once
 
+#include <vector>
+#include <filesystem>
+
+#include <eigen3/Eigen/Dense>
+#include <opencv2/core/eigen.hpp>
+#include <opencv2/opencv.hpp>
+
 #include "camodocal/camera_models/CameraFactory.h"
 #include "camodocal/camera_models/CataCamera.h"
 #include "camodocal/camera_models/PinholeCamera.h"
 #include "parameters.h"
 #include "utility/tic_toc.h"
 #include "utility/utility.h"
-#include <eigen3/Eigen/Dense>
-#include <opencv2/core/eigen.hpp>
-#include <opencv2/opencv.hpp>
-#include <vector>
 
 #define MIN_LOOP_NUM 25
 

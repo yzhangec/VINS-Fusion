@@ -215,7 +215,7 @@ void generate3dPoints(const std::vector<cv::Point2f> &left_pts,
     Vector3d pt3;
     triangulatePoint(P1, P2, pl, pr, pt3);
 
-    if (pt3[2] > 0 && pt3[2] < 5) {
+    if (pt3[2] > 0 && pt3[2] < 8.0) {
       cur_pts_3d.push_back(cv::Point3f(pt3[0], pt3[1], pt3[2]));
       status.push_back(1);
     } else {
@@ -289,18 +289,7 @@ void publishLandmarks(const std::vector<cv::Point3f> &landmarks) {
 void image_pose_callback(const sensor_msgs::ImageConstPtr &image0_msg,
                          const sensor_msgs::ImageConstPtr &image1_msg,
                          const nav_msgs::Odometry::ConstPtr &pose_msg) {
-  static int skip = 0;
-  if (skip % 2 == 1) {
-    skip++;
-    return;
-  }
-  skip++;
-
   m_buf.lock();
-  // std::cout << "image_pose_callback" << std::endl;
-  // std::cout << "image0_msg ts:" << image0_msg->header.stamp << std::endl;
-  // std::cout << "image1_msg ts:" << image1_msg->header.stamp << std::endl;
-  // std::cout << "pose_msg ts:" << pose_msg->header.stamp << std::endl;
   image_pose_buf.push(std::make_tuple(image0_msg, image1_msg, pose_msg));
   m_buf.unlock();
 }
@@ -310,11 +299,6 @@ void image_pose_gt_callback(const sensor_msgs::ImageConstPtr &image0_msg,
                             const nav_msgs::Odometry::ConstPtr &pose_msg,
                             const nav_msgs::Odometry::ConstPtr &pose_gt_msg) {
   m_buf.lock();
-  // std::cout << "image_pose_gt_callback" << std::endl;
-  // std::cout << "image0_msg ts:" << image0_msg->header.stamp << std::endl;
-  // std::cout << "image1_msg ts:" << image1_msg->header.stamp << std::endl;
-  // std::cout << "pose_msg ts:" << pose_msg->header.stamp << std::endl;
-  // std::cout << "pose_gt_msg ts:" << pose_gt_msg->header.stamp << std::endl;
   image_pose_gt_buf.push(std::make_tuple(image0_msg, image1_msg, pose_msg, pose_gt_msg));
   m_buf.unlock();
 }
@@ -476,17 +460,22 @@ void process() {
     nav_msgs::Odometry::ConstPtr pose_gt_msg = NULL;
 
     m_buf.lock();
-    // remove old tuples if tuple size is too large
-    int throw_cnt = 0;
-    while (image_pose_buf.size() > 2) {
-      image_pose_buf.pop();
-      throw_cnt++;
-    }
-    if (throw_cnt > 0) {
-      printf("throw %d image_pose_buf tuples\n", throw_cnt);
-    }
 
+#if 0
     if (!has_gt_pose) {
+      // remove old tuples if tuple size is too large
+      int throw_cnt = 0;
+      while (image_pose_buf.size() > 1) {
+        image_pose_buf.pop();
+        throw_cnt++;
+      }
+      // if (throw_cnt > 0) {
+      //   printf("throw %d image_pose_buf tuples\n", throw_cnt);
+      // }
+
+      // print image_pose_buf.size()
+      // printf("process image_pose_buf.size() = %d\n", (int)image_pose_buf.size());
+
       // get msg from tuple
       if (!image_pose_buf.empty()) {
         std::tuple<sensor_msgs::ImageConstPtr, sensor_msgs::ImageConstPtr,
@@ -498,6 +487,19 @@ void process() {
         pose_msg = std::get<2>(tuple);
       }
     } else {
+      // remove old tuples if tuple size is too large
+      int throw_cnt = 0;
+      while (image_pose_gt_buf.size() > 1) {
+        image_pose_gt_buf.pop();
+        throw_cnt++;
+      }
+      // if (throw_cnt > 0) {
+      //   printf("throw %d image_pose_gt_buf tuples\n", throw_cnt);
+      // }
+
+      // print image_pose_gt_buf.size()
+      // printf("process image_pose_gt_buf.size() = %d\n", (int)image_pose_gt_buf.size());
+
       if (!image_pose_gt_buf.empty()) {
         std::tuple<sensor_msgs::ImageConstPtr, sensor_msgs::ImageConstPtr,
                    nav_msgs::Odometry::ConstPtr, nav_msgs::Odometry::ConstPtr>
@@ -509,6 +511,35 @@ void process() {
         pose_gt_msg = std::get<3>(tuple);
       }
     }
+#endif
+
+    auto process_buffer = [](auto &buffer, auto &... messages) {
+      // Remove old tuples if tuple size is too large
+      int throw_cnt = 0;
+      while (buffer.size() > 1) {
+        buffer.pop();
+        throw_cnt++;
+      }
+
+      // Get msg from tuple if not empty
+      if (!buffer.empty()) {
+        auto tuple = buffer.front();
+        buffer.pop();
+        std::tie(messages...) = tuple;
+      }
+      return throw_cnt;
+    };
+
+    // Then in your original code:
+    if (!has_gt_pose) {
+      int throw_cnt = process_buffer(image_pose_buf, image0_msg, image1_msg, pose_msg);
+      // if (throw_cnt > 0) { printf("throw %d tuples\n", throw_cnt); }
+    } else {
+      int throw_cnt =
+          process_buffer(image_pose_gt_buf, image0_msg, image1_msg, pose_msg, pose_gt_msg);
+      // if (throw_cnt > 0) { printf("throw %d tuples\n", throw_cnt); }
+    }
+
     m_buf.unlock();
 
     if (pose_msg != NULL) {
@@ -576,11 +607,21 @@ void process() {
 #ifdef OPENVINO_ENVIRONMENT
         if (COL == 848) {
           cv::Mat image_crop = image0(cv::Range(0, 480), cv::Range(124, 764));
+
           global_desc = netvlad_openvino->inference(image_crop);
           superpoint_openvino->inference(image_crop, point_2d_uv, local_desc);
+
           for (int i = 0; i < (int)point_2d_uv.size(); i++) {
             point_2d_uv[i].x += 124;
             point_2d_uv[i].y += 0;
+          }
+
+          // imshow with superpoint features
+          if (0) {
+            cv::Mat show_img = image0.clone();
+            drawFeatureOnImage(show_img, point_2d_uv, cv::Scalar(255, 255, 255));
+            cv::imshow("superpoint features", show_img);
+            cv::waitKey(1);
           }
         } else if (COL == 640) {
           // global_desc = netvlad_openvino->inference(image0, true);
@@ -599,13 +640,12 @@ void process() {
 
           // Wait for SuperPoint inference to finish
           superpoint_future.get();
-
         } else {
           ROS_ERROR("image size not supported");
           ROS_BREAK();
         }
 #endif
-        // printf("inference time %f \n", (ros::Time::now() - inference_start_time).toSec());
+        printf("inference time %f \n", (ros::Time::now() - inference_start_time).toSec());
 
         posegraph.faiss_index.add(1, global_desc.data());
 
@@ -636,6 +676,10 @@ void process() {
         reduceVector(point_2d_uv, status);
         reduceVector(landmarks_2d_cam1, status);
         reduceDescriptorVector(local_desc, status);
+
+        std::cout << "point_2d_uv size: " << point_2d_uv.size()
+                  << ", landmarks_2d_cam1 size: " << landmarks_2d_cam1.size() << std::endl;
+
         undistortedPts(point_2d_uv, point_2d_normal, stereo_camera_[0]);
         undistortedPts(landmarks_2d_cam1, un_pts1, stereo_camera_[1]);
         generate3dPoints(point_2d_normal, un_pts1, point_3d, status);
@@ -643,6 +687,11 @@ void process() {
         reduceVector(point_2d_normal, status);
         reduceVector(landmarks_2d_cam1, status);
         reduceDescriptorVector(local_desc, status);
+
+        std::cout << "point_3d size: " << point_3d.size()
+                  << ", point_2d_uv size: " << point_2d_uv.size()
+                  << ", point_2d_normal size: " << point_2d_normal.size()
+                  << ", landmarks_2d_cam1 size: " << landmarks_2d_cam1.size() << std::endl;
 
         for (size_t i = 0; i < point_3d.size(); i++) {
           Eigen::Vector3d pt_c, pt_i, pt_w;
@@ -675,7 +724,7 @@ void process() {
         //   // printf("u %f, v %f \n", p_2d_uv.x, p_2d_uv.y);
         // }
 
-        if (0) {
+        if (1) {
           cv::Mat show_img0, show_img1, show_img;
           show_img0 = image0.clone();
           show_img1 = image1.clone();
@@ -840,10 +889,10 @@ int main(int argc, char **argv) {
   message_filters::Synchronizer<ImageOdometryGTSyncPolicy> stereo_pose_gt_sync_(
       ImageOdometryGTSyncPolicy(100), image0_sub_, image1_sub_, pose_sub_, pose_gt_sub_);
 
-  image0_sub_.subscribe(n, IMAGE0_TOPIC, 100);
-  image1_sub_.subscribe(n, IMAGE1_TOPIC, 100);
-  pose_sub_.subscribe(n, "/vins_estimator/keyframe_pose", 100);
-  pose_gt_sub_.subscribe(n, "/uav_simulator/odometry", 100);
+  image0_sub_.subscribe(n, IMAGE0_TOPIC, 1);
+  image1_sub_.subscribe(n, IMAGE1_TOPIC, 1);
+  pose_sub_.subscribe(n, "/vins_estimator/keyframe_pose", 1);
+  pose_gt_sub_.subscribe(n, "/uav_simulator/odometry", 1);
 
   if (!has_gt_pose)
     stereo_pose_sync_.registerCallback(boost::bind(&image_pose_callback, _1, _2, _3));
