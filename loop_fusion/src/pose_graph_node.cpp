@@ -286,31 +286,6 @@ void publishLandmarks(const std::vector<cv::Point3f> &landmarks) {
   debug_marker_array_pub_.publish(mk_array);
 }
 
-// void image_callback(const sensor_msgs::ImageConstPtr &image0_msg,
-//                     const sensor_msgs::ImageConstPtr &image1_msg) {
-//   // ROS_INFO("image_callback!");
-
-//   loop_fusion::StereoImagePtr stereo_image_msg(new loop_fusion::StereoImage);
-//   stereo_image_msg->header = image0_msg->header;
-//   stereo_image_msg->image0 = *image0_msg;
-//   stereo_image_msg->image1 = *image1_msg;
-
-//   m_buf.lock();
-//   image_buf.push(stereo_image_msg);
-//   m_buf.unlock();
-//   // printf(" image time %f \n", image_msg->header.stamp.toSec());
-
-//   // detect unstable camera stream
-//   // if (last_image_time == -1)
-//   //   last_image_time = image_msg->header.stamp.toSec();
-//   // else if (image_msg->header.stamp.toSec() - last_image_time > 1.0 ||
-//   //          image_msg->header.stamp.toSec() < last_image_time) {
-//   //   ROS_WARN("image discontinue! detect a new sequence!");
-//   //   // new_sequence();
-//   // }
-//   // last_image_time = image_msg->header.stamp.toSec();
-// }
-
 void image_pose_callback(const sensor_msgs::ImageConstPtr &image0_msg,
                          const sensor_msgs::ImageConstPtr &image1_msg,
                          const nav_msgs::Odometry::ConstPtr &pose_msg) {
@@ -405,18 +380,6 @@ void margin_point_callback(const sensor_msgs::PointCloud2ConstPtr &point_msg) {
   // pub_margin_cloud.publish(point_cloud);
 }
 
-void pose_callback(const nav_msgs::Odometry::ConstPtr &pose_msg) {
-  m_buf.lock();
-  pose_buf.push(pose_msg);
-  m_buf.unlock();
-}
-
-void pose_gt_callback(const nav_msgs::Odometry::ConstPtr &pose_msg) {
-  m_buf.lock();
-  pose_gt_buf.push(pose_msg);
-  m_buf.unlock();
-}
-
 void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg) {
   // ROS_INFO("vio_callback!");
   Vector3d vio_t(pose_msg->pose.pose.position.x, pose_msg->pose.pose.position.y,
@@ -507,7 +470,7 @@ void extrinsic_callback(const nav_msgs::Odometry::ConstPtr &pose_msg) {
 void process() {
   while (true) {
     TicToc t_process;
-    
+
     sensor_msgs::Image::ConstPtr image0_msg = NULL, image1_msg = NULL;
     nav_msgs::Odometry::ConstPtr pose_msg = NULL;
     nav_msgs::Odometry::ConstPtr pose_gt_msg = NULL;
@@ -548,7 +511,6 @@ void process() {
     }
     m_buf.unlock();
 
-    
     if (pose_msg != NULL) {
       // printf("pose time %f \n", pose_msg->header.stamp.toSec());
       // if (has_gt_pose)
@@ -592,7 +554,6 @@ void process() {
         std::vector<float> local_desc;
 
         ros::Time inference_start_time = ros::Time::now();
-
 
 #ifdef CUDA_ENVIRONMENT
         if (COL == 848) {
@@ -864,22 +825,16 @@ int main(int argc, char **argv) {
   ros::Subscriber sub_vio = n.subscribe("/vins_estimator/odometry", 1, vio_callback);
   ros::Subscriber sub_camera_pose =
       n.subscribe("/vins_estimator/camera_pose", 1, camera_pose_callback);
-  // ros::Subscriber sub_pose = n.subscribe("/vins_estimator/keyframe_pose", 1, pose_callback);
-  // ros::Subscriber sub_pose_gt = n.subscribe("/uav_simulator/odometry", 1, pose_gt_callback);
   ros::Subscriber sub_extrinsic = n.subscribe("/vins_estimator/extrinsic", 1, extrinsic_callback);
   ros::Subscriber sub_point = n.subscribe("/vins_estimator/keyframe_point", 1, point_callback);
   ros::Subscriber sub_margin_point =
       n.subscribe("/vins_estimator/margin_cloud", 1, margin_point_callback);
-
-  // ros::Subscriber sub_image = n.subscribe(IMAGE_TOPIC, 2000, image_callback);
 
   message_filters::Subscriber<sensor_msgs::Image> image0_sub_;
   message_filters::Subscriber<sensor_msgs::Image> image1_sub_;
   message_filters::Subscriber<nav_msgs::Odometry> pose_sub_;
   message_filters::Subscriber<nav_msgs::Odometry> pose_gt_sub_;
 
-  // message_filters::Synchronizer<ImageSyncPolicy> stereo_sync_(ImageSyncPolicy(100), image0_sub_,
-  //                                                             image1_sub_);
   message_filters::Synchronizer<ImageOdometrySyncPolicy> stereo_pose_sync_(
       ImageOdometrySyncPolicy(100), image0_sub_, image1_sub_, pose_sub_);
   message_filters::Synchronizer<ImageOdometryGTSyncPolicy> stereo_pose_gt_sync_(
@@ -890,7 +845,6 @@ int main(int argc, char **argv) {
   pose_sub_.subscribe(n, "/vins_estimator/keyframe_pose", 100);
   pose_gt_sub_.subscribe(n, "/uav_simulator/odometry", 100);
 
-  // stereo_sync_.registerCallback(boost::bind(&image_callback, _1, _2));
   if (!has_gt_pose)
     stereo_pose_sync_.registerCallback(boost::bind(&image_pose_callback, _1, _2, _3));
   else
