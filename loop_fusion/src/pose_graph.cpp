@@ -39,6 +39,8 @@ void PoseGraph::registerPub(ros::NodeHandle &n) {
   for (int i = 1; i < 10; i++)
     pub_path[i] = n.advertise<nav_msgs::Path>("path_" + to_string(i), 1000);
   pub_loop_pairs = n.advertise<std_msgs::Int32MultiArray>("loop_pairs", 1000);
+  pub_bad_loop_images =
+      n.advertise<std_msgs::Int32MultiArray>("bad_loop_images", 1000);
 }
 
 void PoseGraph::setIMUFlag(bool _use_imu) {
@@ -278,6 +280,108 @@ int PoseGraph::detectLoopML(Keyframe *keyframe, int frame_index) {
       loop_index = labels[i];
       thres = distances[i];
       break;
+    }
+  }
+
+  vector<int> looped_indices;
+  for (int i = 0; i < faiss_query_num; i++) {
+    if (labels[i] < 0) {
+      break;
+    }
+
+    // Set a distance threshold to avoid too many matches of nearby frames
+    int nearby_frames_cutoff = 100;
+    double thres = 0.8;
+    if (labels[i] <= faiss_index.ntotal - nearby_frames_cutoff && distances[i] > thres) {
+      looped_indices.push_back(labels[i]);
+    } 
+
+    if (looped_indices.size() >= 10) {
+      break; // Limit the number of looped indices to avoid excessive processing
+    }
+  }
+
+  // std::cout << "Looped indices: ";
+  // for (const auto &index : looped_indices) {
+  //   std::cout << index << " ";
+  // }
+  // std::cout << std::endl;
+
+  // get looped keyframes and check the distribution of keyframes' positions
+  if (!looped_indices.empty()) {
+    std::vector<Vector3d> looped_positions;
+    for (const auto &index : looped_indices) {
+      Keyframe *looped_kf = getKeyFrame(index);
+      if (looped_kf) {
+        Vector3d pos;
+        Eigen::Matrix3d R;
+        looped_kf->getPose(pos, R);
+        looped_positions.push_back(pos);
+      }
+    }
+
+    // std::cout << "Looped positions: ";
+    // for (const auto &pos : looped_positions) {
+    //   std::cout << "(" << pos.x() << ", " << pos.y() << ", " << pos.z() << ") ";
+    // }
+    // std::cout << std::endl;
+
+    // calculate the mean and sd of looped positions
+    if (!looped_positions.empty()) {
+      auto meanDistanceToCentroid = [](const std::vector<Vector3d> &positions) {
+        Vector3d centroid = Vector3d::Zero();
+        for (const auto &pos : positions) {
+          centroid += pos;
+        }
+        centroid /= positions.size();
+
+        double total_distance = 0.0;
+        for (const auto &pos : positions) {
+          total_distance += (pos - centroid).norm();
+        }
+        return total_distance / positions.size();
+      };
+
+      double mean_distance = meanDistanceToCentroid(looped_positions);
+      // std::cout << "Mean distance to centroid: " << mean_distance << std::endl;
+
+      double threshold = 0.5; // Set a threshold for mean distance
+      if (mean_distance > threshold && DEBUG_IMAGE) {
+        int img_seq = keyframe->img_seq;
+        bad_loop_indices.push_back(img_seq);
+
+        std::cout << "bad_loop_indices: ";
+        for (const auto &index : bad_loop_indices) {
+          std::cout << index << " ";
+        }
+        std::cout << std::endl;
+
+        // imshow
+        // cv::Mat output_image;
+
+        // hconcatenate images from looped keyframes
+        // std::vector<cv::Mat> images;
+        // images.push_back(keyframe->image); // Add the current keyframe image
+        // for (const auto &index : looped_indices) {
+        //   Keyframe *looped_kf = getKeyFrame(index);
+        //   if (looped_kf && !looped_kf->image.empty()) {
+        //     images.push_back(looped_kf->image);
+        //   }
+        // }
+
+        // // resize all images
+        // for (auto &img : images) {
+        //   cv::resize(img, img, cv::Size(640, 480), 0.25, 0.25, cv::INTER_LINEAR);
+        // }
+
+        // if (!images.empty()) {
+        //   cv::hconcat(images, output_image);
+        //   cv::imshow("Looped Keyframes", output_image);
+        //   cv::waitKey(1);
+        // } else {
+        //   std::cout << "No images available for looped keyframes." << std::endl;
+        // }
+      }
     }
   }
 
@@ -569,5 +673,13 @@ void PoseGraph::publish() {
       loop_pairs_msg.data.push_back(loop_pairs[i].second);
     }
     pub_loop_pairs.publish(loop_pairs_msg);
+  }
+
+  if (!bad_loop_indices.empty()) {
+    std_msgs::Int32MultiArray bad_loop_images_msg;
+    for (const auto &index : bad_loop_indices) {
+      bad_loop_images_msg.data.push_back(index);
+    }
+    pub_bad_loop_images.publish(bad_loop_images_msg);
   }
 }

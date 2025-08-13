@@ -651,52 +651,56 @@ void process() {
 
         posegraph.faiss_index.add(1, global_desc.data());
 
-        if (point_2d_uv.size() < 10) {
-          // ROS_WARN("feature points less than 10, skip");
-          continue;
-        }
+        // if (point_2d_uv.size() < 10) {
+        //   // ROS_WARN("feature points less than 10, skip");
+        //   continue;
+        // }
 
         std::vector<cv::Point2f> landmarks_2d_cam1, un_pts0, un_pts1;
         std::vector<uchar> status;
         std::vector<float> err;
 
-        cv::calcOpticalFlowPyrLK(image0, image1, point_2d_uv, landmarks_2d_cam1, status, err,
-                                 cv::Size(21, 21), 3);
+        try {
+          cv::calcOpticalFlowPyrLK(image0, image1, point_2d_uv, landmarks_2d_cam1, status, err,
+                                   cv::Size(21, 21), 3);
 
-        std::vector<uchar> status_rl;
-        std::vector<cv::Point2f> reverseLeftPts;
-        cv::calcOpticalFlowPyrLK(image1, image0, landmarks_2d_cam1, reverseLeftPts, status_rl, err,
-                                 cv::Size(21, 21), 3);
-        for (size_t i = 0; i < status.size(); i++) {
-          if (status[i] && status_rl[i] && inBorder(landmarks_2d_cam1[i], ROW, COL) &&
-              distance(point_2d_uv[i], reverseLeftPts[i]) <= 0.9)
-            status[i] = 1;
-          else
-            status[i] = 0;
+          std::vector<uchar> status_rl;
+          std::vector<cv::Point2f> reverseLeftPts;
+          cv::calcOpticalFlowPyrLK(image1, image0, landmarks_2d_cam1, reverseLeftPts, status_rl,
+                                   err, cv::Size(21, 21), 3);
+          for (size_t i = 0; i < status.size(); i++) {
+            if (status[i] && status_rl[i] && inBorder(landmarks_2d_cam1[i], ROW, COL) &&
+                distance(point_2d_uv[i], reverseLeftPts[i]) <= 0.9)
+              status[i] = 1;
+            else
+              status[i] = 0;
+          }
+
+          reduceVector(point_2d_uv, status);
+          reduceVector(landmarks_2d_cam1, status);
+          reduceDescriptorVector(local_desc, status);
+
+          undistortedPts(point_2d_uv, point_2d_normal, stereo_camera_[0]);
+          undistortedPts(landmarks_2d_cam1, un_pts1, stereo_camera_[1]);
+          generate3dPoints(point_2d_normal, un_pts1, point_3d, status);
+          reduceVector(point_2d_uv, status);
+          reduceVector(point_2d_normal, status);
+          reduceVector(landmarks_2d_cam1, status);
+          reduceDescriptorVector(local_desc, status);
+
+          for (size_t i = 0; i < point_3d.size(); i++) {
+            Eigen::Vector3d pt_c, pt_i, pt_w;
+            pt_c << point_3d[i].x, point_3d[i].y, point_3d[i].z;
+            pt_i = T_i_c.block(0, 0, 3, 3) * pt_c + T_i_c.block(0, 3, 3, 1);
+            pt_w = R * pt_i + T;
+            point_3d[i].x = pt_w(0);
+            point_3d[i].y = pt_w(1);
+            point_3d[i].z = pt_w(2);
+          }
+
+        } catch (cv::Exception &e) {
+          ROS_ERROR("Optical flow calculation failed: %s", e.what());
         }
-
-        reduceVector(point_2d_uv, status);
-        reduceVector(landmarks_2d_cam1, status);
-        reduceDescriptorVector(local_desc, status);
-
-        undistortedPts(point_2d_uv, point_2d_normal, stereo_camera_[0]);
-        undistortedPts(landmarks_2d_cam1, un_pts1, stereo_camera_[1]);
-        generate3dPoints(point_2d_normal, un_pts1, point_3d, status);
-        reduceVector(point_2d_uv, status);
-        reduceVector(point_2d_normal, status);
-        reduceVector(landmarks_2d_cam1, status);
-        reduceDescriptorVector(local_desc, status);
-
-        for (size_t i = 0; i < point_3d.size(); i++) {
-          Eigen::Vector3d pt_c, pt_i, pt_w;
-          pt_c << point_3d[i].x, point_3d[i].y, point_3d[i].z;
-          pt_i = T_i_c.block(0, 0, 3, 3) * pt_c + T_i_c.block(0, 3, 3, 1);
-          pt_w = R * pt_i + T;
-          point_3d[i].x = pt_w(0);
-          point_3d[i].y = pt_w(1);
-          point_3d[i].z = pt_w(2);
-        }
-
         // for (unsigned int i = 0; i < point_msg->points.size(); i++) {
         //   cv::Point3f p_3d;
         //   p_3d.x = point_msg->points[i].x;

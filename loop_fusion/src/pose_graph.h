@@ -82,12 +82,15 @@ private:
   int base_sequence;
   bool use_imu;
 
+  vector<int> bad_loop_indices;
+
   ros::Publisher pub_pg_path;
   ros::Publisher pub_base_path;
   ros::Publisher pub_pose_graph;
   ros::Publisher pub_opt;
   ros::Publisher pub_path[10];   // used for publish different sequence
   ros::Publisher pub_loop_pairs; // publish img_seq for each loop pair
+  ros::Publisher pub_bad_loop_images; // publish img_seq for each loop pair
 };
 
 template <typename T> inline void QuaternionInverse(const T q[4], T q_inverse[4]) {
