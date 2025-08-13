@@ -136,9 +136,6 @@ bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
   cv::Mat descriptors_b(old_kf->point_2d_uv.size(), 256, CV_32F);
   memcpy(descriptors_b.data, old_kf->local_desc.data(), old_kf->local_desc.size() * sizeof(float));
 
-  // std::cout << "descriptors_a.size() = " << descriptors_a.size() << std::endl;
-  // std::cout << "descriptors_b.size() = " << descriptors_b.size() << std::endl;
-
   if (descriptors_a.size().height == 0 || descriptors_b.size().height == 0) {
     return false;
   }
@@ -163,10 +160,10 @@ bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
   reduceVector(pts1, mask);
   reduceVector(pts1_norm, mask);
 
-  checkSize(pts0, NAME(pts0));
-  checkSize(pts0_3d, NAME(pts0_3d));
-  checkSize(pts1, NAME(pts1));
-  checkSize(pts1_norm, NAME(pts1_norm));
+  // checkSize(pts0, NAME(pts0));
+  // checkSize(pts0_3d, NAME(pts0_3d));
+  // checkSize(pts1, NAME(pts1));
+  // checkSize(pts1_norm, NAME(pts1_norm));
 
 #if 0
   if (DEBUG_IMAGE) {
@@ -384,22 +381,14 @@ bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
     relative_q = PnP_R_old.transpose() * origin_vio_R;
     relative_yaw =
         Utility::normalizeAngle(Utility::R2ypr(origin_vio_R).x() - Utility::R2ypr(PnP_R_old).x());
-    // printf("PNP relative\n");
-    // cout << "pnp relative_t " << relative_t.transpose() << endl;
-    // cout << "pnp relative_yaw " << relative_yaw << endl;
     if (abs(relative_yaw) < 30.0 && relative_t.norm() < 20.0) {
-
       has_loop = true;
       loop_index = old_kf->index;
       loop_info << relative_t.x(), relative_t.y(), relative_t.z(), relative_q.w(), relative_q.x(),
           relative_q.y(), relative_q.z(), relative_yaw;
-      // cout << "pnp relative_t " << relative_t.transpose() << endl;
-      // cout << "pnp relative_q " << relative_q.w() << " " << relative_q.vec().transpose() << endl;
       return true;
     }
   }
-  // printf("loop final use num %d %lf--------------- \n", (int)matched_2d_cur.size(),
-  // t_match.toc());
   return false;
 }
 

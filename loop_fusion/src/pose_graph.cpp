@@ -80,9 +80,17 @@ void PoseGraph::addKeyFrame(Keyframe *cur_kf, bool use_gt) {
     if (cur_kf->findConnection(old_kf, use_gt)) {
       printf("cur_kf idx %d img_seq %d detect loop with old_kf idx %d img_seq %d\n", cur_kf->index,
              cur_kf->img_seq, loop_index, old_kf->img_seq);
-      printf("loop info %lf %lf %lf %lf %lf %lf %lf %lf \n", cur_kf->loop_info(0),
-             cur_kf->loop_info(1), cur_kf->loop_info(2), cur_kf->loop_info(3), cur_kf->loop_info(4),
-             cur_kf->loop_info(5), cur_kf->loop_info(6), cur_kf->loop_info(7));
+      printf("loop info x y z qw qx qy qz yaw %lf %lf %lf %lf %lf %lf %lf %lf \n",
+             cur_kf->loop_info(0), cur_kf->loop_info(1), cur_kf->loop_info(2), cur_kf->loop_info(3),
+             cur_kf->loop_info(4), cur_kf->loop_info(5), cur_kf->loop_info(6),
+             cur_kf->loop_info(7));
+
+      // print the difference between vio pose of cur and old keyframe
+      // Vector3d vio_P_old, vio_P_cur;
+      // Matrix3d vio_R_old, vio_R_cur;
+      // old_kf->getVioPose(vio_P_old, vio_R_old);
+      // cur_kf->getVioPose(vio_P_cur, vio_R_cur);
+
       loop_pairs.push_back(std::make_pair(cur_kf->img_seq, old_kf->img_seq));
 
       if (earliest_loop_index > loop_index || earliest_loop_index == -1)
@@ -92,6 +100,14 @@ void PoseGraph::addKeyFrame(Keyframe *cur_kf, bool use_gt) {
       Matrix3d w_R_old, w_R_cur, vio_R_cur;
       old_kf->getVioPose(w_P_old, w_R_old);
       cur_kf->getVioPose(vio_P_cur, vio_R_cur);
+
+      Vector3d diff_P = vio_P_cur - w_P_old;
+      Matrix3d diff_R = vio_R_cur * w_R_old.transpose();
+      Quaterniond diff_Q{diff_R};
+      double diff_yaw =
+          Utility::normalizeAngle(Utility::R2ypr(vio_R_cur).x() - Utility::R2ypr(w_R_old).x());
+      printf("vio pose diff P %lf %lf %lf R %lf %lf %lf %lf yaw %lf\n", diff_P.x(), diff_P.y(),
+             diff_P.z(), diff_Q.w(), diff_Q.x(), diff_Q.y(), diff_Q.z(), diff_yaw);
 
       Vector3d relative_t;
       Quaterniond relative_q;

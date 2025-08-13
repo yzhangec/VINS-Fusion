@@ -448,6 +448,8 @@ void extrinsic_callback(const nav_msgs::Odometry::ConstPtr &pose_msg) {
   qic = Quaterniond(pose_msg->pose.pose.orientation.w, pose_msg->pose.pose.orientation.x,
                     pose_msg->pose.pose.orientation.y, pose_msg->pose.pose.orientation.z)
             .toRotationMatrix();
+  T_i_c.block(0, 0, 3, 3) = qic;
+  T_i_c.block(0, 3, 3, 1) = tic;
   m_process.unlock();
 }
 
@@ -677,9 +679,6 @@ void process() {
         reduceVector(landmarks_2d_cam1, status);
         reduceDescriptorVector(local_desc, status);
 
-        std::cout << "point_2d_uv size: " << point_2d_uv.size()
-                  << ", landmarks_2d_cam1 size: " << landmarks_2d_cam1.size() << std::endl;
-
         undistortedPts(point_2d_uv, point_2d_normal, stereo_camera_[0]);
         undistortedPts(landmarks_2d_cam1, un_pts1, stereo_camera_[1]);
         generate3dPoints(point_2d_normal, un_pts1, point_3d, status);
@@ -687,11 +686,6 @@ void process() {
         reduceVector(point_2d_normal, status);
         reduceVector(landmarks_2d_cam1, status);
         reduceDescriptorVector(local_desc, status);
-
-        std::cout << "point_3d size: " << point_3d.size()
-                  << ", point_2d_uv size: " << point_2d_uv.size()
-                  << ", point_2d_normal size: " << point_2d_normal.size()
-                  << ", landmarks_2d_cam1 size: " << landmarks_2d_cam1.size() << std::endl;
 
         for (size_t i = 0; i < point_3d.size(); i++) {
           Eigen::Vector3d pt_c, pt_i, pt_w;
