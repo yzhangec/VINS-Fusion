@@ -387,6 +387,9 @@ bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
       loop_info << relative_t.x(), relative_t.y(), relative_t.z(), relative_q.w(), relative_q.x(),
           relative_q.y(), relative_q.z(), relative_yaw;
       return true;
+    } else {
+      printf("loop relative t: %.2f, %.2f, %.2f, yaw: %.2f, too large, not a loop\n",
+             relative_t.x(), relative_t.y(), relative_t.z(), relative_yaw);
     }
   }
   return false;
@@ -512,8 +515,9 @@ bool Keyframe::estimateTBetweenFrames(vector<cv::Point3f> &cur_pts_3d,
   }
 
   Matrix3d R_w_c_old;
-  R_w_c_old = R.transpose();
   Vector3d T_w_c_old;
+
+  R_w_c_old = R.transpose();
   T_w_c_old = R_w_c_old * (-t);
 
   R = R_w_c_old * qic.transpose();

@@ -647,7 +647,7 @@ void process() {
           ROS_BREAK();
         }
 #endif
-        printf("inference time %f \n", (ros::Time::now() - inference_start_time).toSec());
+        // printf("inference time %f \n", (ros::Time::now() - inference_start_time).toSec());
 
         posegraph.faiss_index.add(1, global_desc.data());
 
@@ -718,7 +718,7 @@ void process() {
         //   // printf("u %f, v %f \n", p_2d_uv.x, p_2d_uv.y);
         // }
 
-        if (1) {
+        if (0) {
           cv::Mat show_img0, show_img1, show_img;
           show_img0 = image0.clone();
           show_img1 = image1.clone();
