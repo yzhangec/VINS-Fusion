@@ -41,22 +41,22 @@ body_T_cam0: !!opencv-matrix
    rows: 4
    cols: 4
    dt: d
-   data: [ 2.5705868255677666e-03, 1.4928809623624417e-02,
-       9.9988525478006429e-01, 8.3451510568253034e-02,
-       -9.9957678253831839e-01, -2.8935185151108378e-02,
-       3.0018112223706983e-03, 1.8844224776839003e-02,
-       2.8976678445188975e-02, -9.9946980229694438e-01,
-       1.4848111084964644e-02, 5.1127023152154762e-02, 0., 0., 0., 1. ]
+   data: [ 4.5522955287380373e-03, 9.6379635422561560e-03,
+       9.9994319151848687e-01, 7.6972174202573684e-02,
+       -9.9961626423095273e-01, -2.7279153492944630e-02,
+       4.8137375980645825e-03, 4.1622361115736584e-02,
+       2.7323998433129659e-02, -9.9958139110502997e-01,
+       9.5100823424303371e-03, 7.3039548675010169e-02, 0., 0., 0., 1. ]
 body_T_cam1: !!opencv-matrix
    rows: 4
    cols: 4
    dt: d
-   data: [ 3.4670853857226014e-03, 1.4336410235599173e-02,
-       9.9989121741341669e-01, 8.4617779587840627e-02,
-       -9.9957471350203941e-01, -2.8902157883437418e-02,
-       3.8803861916787419e-03, -2.7668794077357652e-02,
-       2.8954644640261484e-02, -9.9947943080947765e-01,
-       1.4230106904683293e-02, 5.2264628503605012e-02, 0., 0., 0., 1. ]
+   data: [ 5.5868066813018480e-03, 9.0864810609891378e-03,
+       9.9994311010828740e-01, 7.8272741929345815e-02,
+       -9.9961179347538076e-01, -2.7244155675851367e-02,
+       5.8325231626790153e-03, -5.3946980273392418e-03,
+       2.7295602870040403e-02, -9.9958751084806918e-01,
+       8.9307457987988226e-03, 7.3991362681519707e-02, 0., 0., 0., 1. ]
 
 #Multiple thread support
 multiple_thread: 1
@@ -75,8 +75,8 @@ max_num_iterations: 8   # max solver itrations, to guarantee real time
 keyframe_parallax: 10.0 # keyframe selection threshold (pixel)
 
 #imu parameters       The more accurate parameters you provide, the better performance
-acc_n: 0.1          # accelerometer measurement noise standard deviation. #0.2   0.04
-gyr_n: 0.01         # gyroscope measurement noise standard deviation.     #0.05  0.004
+acc_n: 0.2          # accelerometer measurement noise standard deviation. #0.2   0.04
+gyr_n: 0.02         # gyroscope measurement noise standard deviation.     #0.05  0.004
 acc_w: 0.001         # accelerometer bias random work noise standard deviation.  #0.002
 gyr_w: 0.0001       # gyroscope bias random work noise standard deviation.     #4.0e-5
 g_norm: 9.805         # gravity magnitude

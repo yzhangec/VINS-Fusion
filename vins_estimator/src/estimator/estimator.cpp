@@ -239,6 +239,7 @@ bool Estimator::IMUAvailable(double t) {
 void Estimator::processMeasurements() {
   while (1) {
     // printf("process measurments\n");
+    TicToc t_start;
     pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>>> feature;
     vector<pair<double, Eigen::Vector3d>> accVector, gyrVector;
     if (!featureBuf.empty()) {
@@ -267,6 +268,8 @@ void Estimator::processMeasurements() {
       }
       mBuf.unlock();
 
+      printf("process featureBuf: %fms \n", t_start.toc());
+
       if (USE_IMU) {
         if (!initFirstPoseFlag)
           initFirstIMUPose(accVector);
@@ -281,11 +284,21 @@ void Estimator::processMeasurements() {
           processIMU(accVector[i].first, dt, accVector[i].second, gyrVector[i].second);
         }
       }
+
+      printf("process mProcess: %fms \n", t_start.toc());
+
       mProcess.lock();
+      printf("process mProcess2: %fms \n", t_start.toc());
+
       processImage(feature.second, feature.first);
+      printf("process processImage: %fms \n", t_start.toc());
+
       prevTime = curTime;
 
       printStatistics(*this, 0);
+
+      printf("process printStatistics: %fms \n", t_start.toc());
+
 
       std_msgs::Header header;
       header.frame_id = "world";
@@ -297,7 +310,11 @@ void Estimator::processMeasurements() {
       pubPointCloud(*this, header);
       pubKeyframe(*this);
       pubTF(*this, header);
+      printf("process pub: %fms \n", t_start.toc());
+
       mProcess.unlock();
+      printf("process unlock: %fms \n", t_start.toc());
+
     }
 
     if (!MULTIPLE_THREAD)
@@ -1005,7 +1022,7 @@ void Estimator::optimization() {
   ceres::Solve(options, &problem, &summary);
   // cout << summary.BriefReport() << endl;
   ROS_DEBUG("Iterations : %d", static_cast<int>(summary.iterations.size()));
-  // printf("solver costs: %f \n", t_solver.toc());
+  printf("solver costs: %f \n", t_solver.toc());
 
   double2vector();
   // printf("frame_count: %d \n", frame_count);

@@ -1,6 +1,6 @@
 <launch>
   <arg name="enable_loop" default="false" />
-  <arg name="config_file" default="$(find vins)/../config/realsense_d435i/realsense_stereo_imu_config.yaml" />
+  <arg name="config_file" default="$(find vins)/../config/realsense_d435i_raven/realsense_stereo_imu_config.yaml" />
 
   <node name="vins_estimator" pkg="vins" type="vins_node" output="screen" args="$(arg config_file)" />
 

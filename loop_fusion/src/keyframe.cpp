@@ -349,7 +349,7 @@ bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
   // if ((int)matched_2d_cur.size() > MIN_LOOP_NUM) {
   if (pnp_success) {
 
-#if 1
+#if 0
     if (DEBUG_IMAGE) {
       cv::Mat show_loop_img;
       cv::hconcat(image, old_kf->image, show_loop_img);
