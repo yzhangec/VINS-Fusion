@@ -376,18 +376,25 @@ bool Keyframe::findConnection(Keyframe *old_kf, bool use_gt) {
     }
 #endif
 
+    // relative t between old_kf and current frame
+    Vector3d t_diff = T_w_i - old_kf->T_w_i;
+    // printf("t_diff norm: %.2f, ", t_diff.norm());
+
     // PnP_R_old: R_w_old, PnP_T_old: T_w_old
     relative_t = PnP_R_old.transpose() * (origin_vio_T - PnP_T_old);
     relative_q = PnP_R_old.transpose() * origin_vio_R;
     relative_yaw =
         Utility::normalizeAngle(Utility::R2ypr(origin_vio_R).x() - Utility::R2ypr(PnP_R_old).x());
-    if (abs(relative_yaw) < 30.0 && relative_t.norm() < 20.0) {
+    if (abs(relative_yaw) < 30.0 && relative_t.norm() < 20.0 && t_diff.norm() < 3.0) {
       has_loop = true;
       loop_index = old_kf->index;
       loop_info << relative_t.x(), relative_t.y(), relative_t.z(), relative_q.w(), relative_q.x(),
           relative_q.y(), relative_q.z(), relative_yaw;
       return true;
     } else {
+      if (t_diff.norm() > 3.0) {
+        ROS_ERROR("[LoopFusion] loop connection too far, not a loop, t_diff norm: %.2f", t_diff.norm());
+      }
       printf("loop relative t: %.2f, %.2f, %.2f, yaw: %.2f, too large, not a loop\n",
              relative_t.x(), relative_t.y(), relative_t.z(), relative_yaw);
     }
