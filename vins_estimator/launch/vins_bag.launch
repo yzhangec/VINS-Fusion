@@ -1,0 +1,14 @@
+<launch>
+  <arg name="enable_loop" default="true" />
+  <arg name="config_file" default="$(env HOME)/workspace/exploration_ws/src/VINS-Fusion/config/habitat_sim/habitat_sim.yaml" />
+  <arg name="bag_file" default="/home/eason-wsl/bag/vins_after2s.bag" />
+
+  <node name="vins_estimator" pkg="vins" type="vins_node" output="screen" args="$(arg config_file)" />
+
+  <group if="$(arg enable_loop)">
+    <node name="loop_fusion" pkg="loop_fusion" type="loop_fusion_node" output="screen" args="$(arg config_file)" />
+  </group>
+
+  <!-- Play bag file -->
+  <node pkg="rosbag" type="play" name="player" output="screen" args="--clock --delay 1 $(arg bag_file)" />
+</launch>
